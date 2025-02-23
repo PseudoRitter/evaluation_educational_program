@@ -19,9 +19,9 @@ class Logic:
     def __init__(self):
         self.filename = None
         self.results = None
-        self.preprocessor = None  # Экземпляр TextPreprocessor
-        self.matcher = None      # Экземпляр SkillMatcher
-        self.device = "cpu"      # Устройство для работы с моделями
+        self.preprocessor = None
+        self.matcher = None
+        self.device = "cpu"
 
     def load_file(self):
         try:
@@ -48,7 +48,7 @@ class Logic:
             job_descriptions = loader.load_vacancy_descriptions_field()
 
             preprocessor = TextPreprocessor()
-            device = preprocessor.device  # Получаем устройство из TextPreprocessor
+            device = preprocessor.device
             logging.info(f"Используется устройство: {device}")
 
             original_texts = "\n".join(job_descriptions)
@@ -56,9 +56,14 @@ class Logic:
             filtered_texts = []
 
             for desc in job_descriptions:
-                clean_text = preprocessor.remove_html_tags(desc)
-                sentences = preprocessor.segment_text(clean_text)
-                tokenized_texts.append("\n".join(sentences))
+                clean_html_text = preprocessor.remove_html_tags(desc)
+                clean_list_text = preprocessor.remove_list_tags(clean_html_text)  # Исправлено имя метода
+                if clean_list_text is None:  # Проверка на None
+                    clean_list_text = ""
+                normalize_spaces_text = preprocessor.normalize_spaces(clean_list_text)
+                sentences = preprocessor.segment_text(normalize_spaces_text)
+                clean_short_sentences = preprocessor.filter_short_sentences(sentences)
+                tokenized_texts.append("\n".join(clean_short_sentences))
                 filtered_sentences = preprocessor.filter_sentences(sentences)
                 filtered_texts.append("\n".join(filtered_sentences))
 
@@ -74,11 +79,11 @@ class Logic:
 
             if device == "cuda":
                 logging.info("Кэш GPU очищен после классификации.")
-                gc.collect()  # Вызываем сборщик мусора
-                torch.cuda.empty_cache()  # Очищаем кэш GPU
+                gc.collect()
+                torch.cuda.empty_cache()
 
             gui.show_info("Шаг 2: Оценка соответствия компетенций...")
-            matcher = SkillMatcher(device=device)  # Передаем устройство в SkillMatcher
+            matcher = SkillMatcher(device=device)
             results = matcher.match_skills(skills, filtered_texts.split('\n'), batch_size=64)
             self.results = results["sentence_transformer"]
 
@@ -94,31 +99,25 @@ class Logic:
             gui.show_error(f"Произошла ошибка: {e}")
             return {}
         finally:
-            # Очистка кэша GPU после завершения анализа
             if hasattr(self, 'device') and self.device == "cuda":
                 logging.info("Очистка кэша GPU после завершения анализа...")
                 if 'matcher' in locals() and hasattr(matcher, 'model'):
-                    matcher.model.to("cpu")  # Перемещаем модель SkillMatcher на CPU
-                del preprocessor  # Удаляем объект TextPreprocessor
-                gc.collect()       # Вызываем сборщик мусора
-                torch.cuda.empty_cache()  # Очищаем кэш GPU
+                    matcher.model.to("cpu")
+                del preprocessor
+                gc.collect()
+                torch.cuda.empty_cache()
 
     def export_results_to_excel(self):
-        if not self.results:  # Проверяем, есть ли результаты для экспорта
+        if not self.results:
             messagebox.showerror("Ошибка", "Нет данных для экспорта! Сначала запустите анализ.")
             return
 
-        # Создаем экземпляр класса ExcelExporter и передаем ему результаты анализа
         exporter = ExcelExporter(self.results)
-        # Выполняем экспорт и получаем сообщение о результате
         result_message = exporter.export_to_excel()
-
-        # Выводим сообщение пользователю
         # if result_message.startswith("Данные успешно экспортированы"):
         #     messagebox.showinfo("Успех", result_message)
         # else:
         #     messagebox.showwarning("Предупреждение", result_message)
-
 
     @staticmethod
     def validate(possible_new_value):

@@ -1,5 +1,5 @@
 import re
-from razdel import sentenize  # Импортируем razdel для разбиения текста на предложения
+from razdel import sentenize
 import torch
 import numpy as np
 import gc
@@ -12,7 +12,7 @@ def cosine_similarity(vec1, vec2):
     return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
 class TextPreprocessor:
-    def __init__(self, model_path="C:/python-models/fine_tuned_model_v3"):
+    def __init__(self, model_path="C:/python-models/fine_tuned_model_v4"):
         try:
             model_path = os.path.normpath(model_path)
             if not os.path.exists(model_path):
@@ -28,62 +28,79 @@ class TextPreprocessor:
             raise ValueError(f"Не удалось загрузить модель из {model_path}. Проверьте путь.")
 
     def remove_html_tags(self, text):
-        """Удаляет HTML-теги из текста."""
-        banned_words = ['&quot;', "</strong>", "<strong>", "</p>", "<p>", "</em>","<em>", "</ol>", "<ol>",
-                         "</div>", "<div>", "</h1>", "<h1>", "</h2>", "<h2>", "</ul>", "<ul>", "<b>", "</b>", "✅",
-                         "</h3>","<h3>"]
+        banned_words = ['&quot', "</strong>", "<strong>", "</p>", "<p>", "</em>", "<em>", "</ol>", "<ol>",
+                        "</div>", "<div>", "</h1>", "<h1>", "</h2>", "<h2>", "</ul>", "<ul>", "<b>", "</b>", "✅",
+                        "</h3>", "<h3>", "<li>"]
         clean_text = text
         for word in banned_words:
             clean_text = re.sub(re.escape(word), ' ', clean_text)
         return clean_text.strip()
 
-    def segment_text(self, text, min_words=2):
+    def remove_list_tags(self, text):  # Исправлено название метода
         try:
-            # Замена HTML-тегов на пробелы
-            text = re.sub(r'</?li>', ' ', text)
-            text = re.sub(r'<br />', '\n', text) # Обработка разных форм <br>
-            
-            # Разбиение текста на предложения
+            text = re.sub(r'</li>', '\n', text)
+            text = re.sub(r'<br />', '\n', text)
+            return text  
+        except Exception as e:
+            logging.error(f"Ошибка при удалении тегов списков: {e}", exc_info=True)
+            return text  # Возвращаем исходный текст в случае ошибки
+
+    def normalize_spaces(self, text):
+        try:
+            if not isinstance(text, str):
+                logging.warning(f"Получен неверный тип данных: {type(text)}. Возвращаем пустую строку.")
+                return ""
+            normalized_text = re.sub(r'\s+', ' ', text).strip()
+            return normalized_text
+        except Exception as e:
+            logging.error(f"Ошибка при нормализации пробелов: {e}", exc_info=True)
+            return ""
+
+    def segment_text(self, text):
+        try:
             sentences = [s.text.strip() for s in sentenize(text) if s.text.strip()]
-            
-            # Фильтрация предложений по длине
+            return sentences
+        except Exception as e:
+            logging.error(f"Ошибка при сегментации текста: {e}", exc_info=True)
+            return []  
+
+    def filter_short_sentences(self, sentences, min_words=3):
+        """Фильтрует предложения, удаляя короткие (менее min_words слов) и пустые"""
+        try:
             filtered_sentences = [
                 sentence for sentence in sentences
-                if len(sentence.split()) >= min_words
+                if sentence.strip() and len(sentence.split()) >= min_words
             ]
-            
             return filtered_sentences
-        
         except Exception as e:
-            logging.error(f"Ошибка при разбиении текста на предложения: {e}", exc_info=True)
-            raise
+            logging.error(f"Ошибка при фильтрации предложений: {e}", exc_info=True)
+            return []  
 
     def filter_sentences(self, sentences):
         """Ограничивает длину каждого предложения до 512 символов."""
         return [sentence[:512] for sentence in sentences]
 
-    def classify_sentences(self, sentences, batch_size=64, exclude_category_label=1):
+    def classify_sentences(self, sentences, batch_size=32, exclude_category_label=1):
         try:
             results = []
             filtered_sentences = []
             sentence_embeddings = self._encode_in_batches(sentences, batch_size)
             for sentence_embedding, sentence in zip(sentence_embeddings, sentences):
                 label = np.argmax(sentence_embedding)
-                if label != exclude_category_label:
+                if label == exclude_category_label: #выбор какую категорию исключать != о компании/условия работы; == нунжное
                     results.append((sentence, label))
                     filtered_sentences.append(sentence)
             return results, filtered_sentences
         except Exception as e:
             logging.error(f"Ошибка при классификации предложений: {e}", exc_info=True)
-            raise
+            return [], []  
         finally:
-            # Очистка кэша GPU после классификации
             if self.device == "cuda":
                 logging.info("Очистка кэша GPU после классификации...")
-                self.model.to("cpu")  # Перемещаем модель на CPU
-                del self.model       # Удаляем модель из памяти
-                gc.collect()         # Вызываем сборщик мусора
-                torch.cuda.empty_cache()  # Очищаем кэш GPU
+                self.model.to("cpu")
+                del self.model
+                gc.collect()
+                torch.cuda.empty_cache()
 
     def _encode_in_batches(self, texts, batch_size):
         try:
@@ -100,4 +117,4 @@ class TextPreprocessor:
             return np.array(all_embeddings)
         except Exception as e:
             logging.error(f"Ошибка при кодировании текстов: {e}", exc_info=True)
-            raise
+            return np.array([])  # Возвращаем пустой массив в случае ошибки

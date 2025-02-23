@@ -61,7 +61,7 @@ def fine_tune_model(train_df, eval_df, output_dir="C:/python-models/fine_tuned_m
     print(f"Using device: {device}")
     
     # Загрузка предобученной модели и токенизатора
-    tokenizer = AutoTokenizer.from_pretrained("DeepPavlov/rubert-base-cased")
+    tokenizer = AutoTokenizer.from_pretrained("DeepPavlov/rubert-base-cased-sentence")
     model = AutoModelForSequenceClassification.from_pretrained("DeepPavlov/rubert-base-cased", num_labels=2)
     model.to(device)  # Перемещение модели на GPU (если доступно)
     
@@ -85,12 +85,12 @@ def fine_tune_model(train_df, eval_df, output_dir="C:/python-models/fine_tuned_m
         evaluation_strategy="epoch",
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
-        num_train_epochs=4,
+        num_train_epochs=3,
         weight_decay=0.01,
         logging_dir="./logs",
         logging_steps=10,
         save_strategy="epoch",
-        fp16=True if device == "cuda" else False,  # Использование FP16 для ускорения на GPU
+        fp16=True if device == "cuda" else False,  
     )
     
     # Создание объекта Trainer
