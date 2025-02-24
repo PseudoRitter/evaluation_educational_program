@@ -58,8 +58,6 @@ class Logic:
             for desc in job_descriptions:
                 clean_html_text = preprocessor.remove_html_tags(desc)
                 clean_list_text = preprocessor.remove_list_tags(clean_html_text)  # Исправлено имя метода
-                if clean_list_text is None:  # Проверка на None
-                    clean_list_text = ""
                 normalize_spaces_text = preprocessor.normalize_spaces(clean_list_text)
                 sentences = preprocessor.segment_text(normalize_spaces_text)
                 clean_short_sentences = preprocessor.filter_short_sentences(sentences)

@@ -3,7 +3,6 @@ import logging
 from gui import App
 from logic import Logic
 
-# Настройка логирования
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -20,4 +19,3 @@ if __name__ == "__main__":
         root.mainloop()  # Запуск основного цикла обработки событий
     except Exception as e:
         logging.error(f"Ошибка в main.py: {e}", exc_info=True)
-        

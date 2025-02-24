@@ -80,14 +80,14 @@ class TextPreprocessor:
         """Ограничивает длину каждого предложения до 512 символов."""
         return [sentence[:512] for sentence in sentences]
 
-    def classify_sentences(self, sentences, batch_size=32, exclude_category_label=1):
+    def classify_sentences(self, sentences, batch_size=64, exclude_category_label=1):
         try:
             results = []
             filtered_sentences = []
             sentence_embeddings = self._encode_in_batches(sentences, batch_size)
             for sentence_embedding, sentence in zip(sentence_embeddings, sentences):
                 label = np.argmax(sentence_embedding)
-                if label == exclude_category_label: #выбор какую категорию исключать != о компании/условия работы; == нунжное
+                if label != exclude_category_label: #выбор какую категорию исключать != о компании/условия работы; == требования
                     results.append((sentence, label))
                     filtered_sentences.append(sentence)
             return results, filtered_sentences
