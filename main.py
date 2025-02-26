@@ -1,13 +1,13 @@
 import tkinter as tk
 import logging
-from gui import App
+from gui.app import App
 from logic import Logic
 
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.StreamHandler()          # Вывод логов в консоль
+        logging.StreamHandler()         
     ]
 )
 

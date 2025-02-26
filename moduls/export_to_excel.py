@@ -10,12 +10,35 @@ class ExcelExporter:
         if not self.results:
             return "Нет данных для экспорта! Сначала запустите анализ."
 
-        # Создание DataFrame для экспорта
+        # Извлечение данных о компетенциях, типах и оценках
+        competences = []
+        competence_types = []
+        scores = []
+
+        for skill, (score, ctype) in self.results["similarity_results"].items():
+            competences.append(skill)
+            competence_types.append(ctype)
+            scores.append(score)
+
+        # Создание DataFrame для компетенций
         data = {
-            "Описание компетенции": list(self.results.keys()),
-            "Оценка": list(self.results.values())
+            "Описание компетенции": competences,
+            "Вид компетенции": competence_types,
+            "Оценка": scores
         }
-        df = pd.DataFrame(data)
+        df_competences = pd.DataFrame(data)
+
+        # Добавление общих результатов (оценки групп компетенций и общей оценки)
+        if "group_scores" in self.results and "overall_score" in self.results:
+            group_scores_data = []
+            for ctype, score in self.results["group_scores"].items():
+                group_scores_data.append({"Описание компетенции": f"Оценка группы: {ctype}", "Вид компетенции": "", "Оценка": score})
+            overall_score_data = {"Описание компетенции": "Общая оценка программы", "Вид компетенции": "", "Оценка": self.results["overall_score"]}
+            group_scores_df = pd.DataFrame(group_scores_data)
+            overall_score_df = pd.DataFrame([overall_score_data])
+            df = pd.concat([df_competences, group_scores_df, overall_score_df], ignore_index=True)
+        else:
+            df = df_competences
 
         # Открытие диалогового окна для выбора пути сохранения
         filepath = filedialog.asksaveasfilename(
