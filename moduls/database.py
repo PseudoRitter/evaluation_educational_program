@@ -5,7 +5,7 @@ import os
 from psycopg2 import Error
 
 class Database:
-    def __init__(self, db_params, data_dir="data"):
+    def __init__(self, db_params, data_dir="vacancies"):
         """Инициализация подключения к базе данных PostgreSQL."""
         self.db_params = db_params
         self.data_dir = data_dir  # Директория, где хранятся JSON-файлы
@@ -104,14 +104,14 @@ class Database:
                 logging.error(f"Файл вакансии не найден: {full_path}")
                 return None
             with open(full_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+                vacancy_data = json.load(f)
             # Предполагаем, что JSON — это список вакансий, берём первую (или все, если нужно)
-            if isinstance(data, list):
-                for vacancy in data:
+            if isinstance(vacancy_data, list):
+                for vacancy in vacancy_data:
                     if 'full_description' in vacancy:
                         return vacancy['full_description']
-            elif isinstance(data, dict) and 'full_description' in data:
-                return data['full_description']
+            elif isinstance(vacancy_data, dict) and 'full_description' in vacancy_data:
+                return vacancy_data['full_description']
             logging.warning(f"Не найдено поле 'full_description' в файле: {full_path}")
             return ''
         except (json.JSONDecodeError, Exception) as e:
@@ -171,7 +171,7 @@ if __name__ == "__main__":
         "port": "5432"
     }
 
-    db = Database(db_params, data_dir="data")
+    db = Database(db_params, data_dir="vacancies")
     try:
         # Пример получения данных
         programs = db.fetch_educational_programs()

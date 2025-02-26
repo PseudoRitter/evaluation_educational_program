@@ -30,7 +30,7 @@ class Logic:
             "host": "localhost",
             "port": "5432"
         }
-        self.db = Database(self.db_params, data_dir="data")
+        self.db = Database(self.db_params, data_dir="vacancies")
 
     def load_vacancies_from_db(self):
         """Получение списка вакансий из БД для отображения в интерфейсе."""
