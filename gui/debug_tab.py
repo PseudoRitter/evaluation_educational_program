@@ -22,6 +22,6 @@ def create_debug_tab(frame, app):
     app.result_text_area.pack()
     app.result_text_area = app.result_text_area  # Сохраняем как атрибут
 
-    # Кнопка для экспорта результатов в TXT
-    app.export_txt_button = tk.Button(frame, text="Экспорт в TXT", command=app.export_to_txt)
-    app.export_txt_button.pack(pady=10)
+    # # Кнопка для экспорта результатов в TXT
+    # app.export_txt_button = tk.Button(frame, text="Экспорт в TXT", command=app.export_to_txt)
+    # app.export_txt_button.pack(pady=10)
