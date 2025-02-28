@@ -17,23 +17,27 @@ def create_add_program_window(root, app):
     university_frame = tk.Frame(main_frame)
     university_frame.pack(pady=5, fill="x", expand=True)
 
-    # Фрейм для таблицы ВУЗов
-    university_table_frame = ttk.LabelFrame(university_frame, text="Выбор или работа с ВУЗами")
-    university_table_frame.pack(pady=5, padx=5, fill="x", expand=True)
+    # Фрейм для таблицы ВУЗов и кнопок
+    university_container = tk.Frame(university_frame)
+    university_container.pack(pady=5, fill="x", expand=True)
 
-    # Таблица для ВУЗов (высота 200 пикселей)
-    app.university_table = ttk.Treeview(university_table_frame, columns=("full_name", "short_name", "city"), show="headings", height=2)
+    # Фрейм для таблицы ВУЗов
+    university_table_frame = ttk.LabelFrame(university_container, text="Выбор или работа с ВУЗами")
+    university_table_frame.pack(side=tk.LEFT, pady=5, padx=5, fill="both", expand=True)
+
+    # Таблица для ВУЗов (уменьшенная ширина)
+    app.university_table = ttk.Treeview(university_table_frame, columns=("full_name", "short_name", "city"), show="headings", height=6)
     app.university_table.heading("full_name", text="Наименование ВУЗа")
     app.university_table.heading("short_name", text="Сокращение")
     app.university_table.heading("city", text="Город")
-    app.university_table.column("full_name", width=400)
-    app.university_table.column("short_name", width=150)
-    app.university_table.column("city", width=150)
-    app.university_table.pack(pady=5, fill="x", expand=False)
+    app.university_table.column("full_name", width=300)  # Уменьшена ширина
+    app.university_table.column("short_name", width=120)
+    app.university_table.column("city", width=120)
+    app.university_table.pack(pady=5, fill="both", expand=True)
 
-    # Фрейм для кнопок ВУЗов (под таблицей)
-    university_button_frame = tk.Frame(university_frame)
-    university_button_frame.pack(pady=5, padx=5)
+    # Фрейм для кнопок ВУЗов (справа)
+    university_button_frame = tk.Frame(university_container)
+    university_button_frame.pack(side=tk.LEFT, padx=5, pady=5, fill="y")
 
     # Кнопки для ВУЗов в порядке: Добавить, Редактировать, Удалить
     app.add_university_button = tk.Button(university_button_frame, text="Добавить", command=lambda: add_new_university(app, add_window))
@@ -49,30 +53,34 @@ def create_add_program_window(root, app):
     program_frame = tk.Frame(main_frame)
     program_frame.pack(pady=5, fill="x", expand=True)
 
-    # Фрейм для таблицы образовательных программ
-    program_table_frame = ttk.LabelFrame(program_frame, text="Добавить образовательную программу")
-    program_table_frame.pack(pady=5, padx=5, fill="x", expand=True)
+    # Фрейм для таблицы образовательных программ и кнопок
+    program_container = tk.Frame(program_frame)
+    program_container.pack(pady=5, fill="x", expand=True)
 
-    # Таблица для образовательных программ (высота 200 пикселей)
-    app.program_table = ttk.Treeview(program_table_frame, columns=("name", "code", "year", "university_short", "type"), show="headings", height=2)
+    # Фрейм для таблицы образовательных программ
+    program_table_frame = ttk.LabelFrame(program_container, text="Добавить образовательную программу")
+    program_table_frame.pack(side=tk.LEFT, pady=5, padx=5, fill="both", expand=True)
+
+    # Таблица для образовательных программ (уменьшенная ширина)
+    app.program_table = ttk.Treeview(program_table_frame, columns=("name", "code", "year", "university_short", "type"), show="headings", height=6)
     app.program_table.heading("name", text="Наименование ОП")
     app.program_table.heading("code", text="Код ОП")
     app.program_table.heading("year", text="Год ОП")
     app.program_table.heading("university_short", text="Краткое наименование ВУЗа")
     app.program_table.heading("type", text="Вид образовательной программы")
-    app.program_table.column("name", width=200)
-    app.program_table.column("code", width=100)
-    app.program_table.column("year", width=80)  # Уменьшено для отображения текста года
-    app.program_table.column("university_short", width=150)
-    app.program_table.column("type", width=150)
-    app.program_table.pack(pady=5, fill="x", expand=False)
+    app.program_table.column("name", width=150)  # Уменьшена ширина
+    app.program_table.column("code", width=80)
+    app.program_table.column("year", width=60)
+    app.program_table.column("university_short", width=120)
+    app.program_table.column("type", width=120)
+    app.program_table.pack(pady=5, fill="both", expand=True)
     app.program_table.bind("<<TreeviewSelect>>", lambda event: on_program_table_select(app))
 
-    # Фрейм для кнопок образовательных программ (под таблицей)
-    program_button_frame = tk.Frame(program_frame)
-    program_button_frame.pack(pady=5, padx=5)
+    # Фрейм для кнопок образовательных программ (справа)
+    program_button_frame = tk.Frame(program_container)
+    program_button_frame.pack(side=tk.LEFT, padx=5, pady=5, fill="y")
 
-    # Кнопки для образовательных программ в порядке: Добавить, Редактировать, Удалить, Выбрать
+    # Кнопки для образовательных программ
     app.add_program_button = tk.Button(program_button_frame, text="Добавить", command=lambda: add_new_program(app, add_window))
     app.add_program_button.pack(pady=5)
 
@@ -82,7 +90,7 @@ def create_add_program_window(root, app):
     app.delete_program_button = tk.Button(program_button_frame, text="Удалить", command=lambda: delete_program(app, add_window))
     app.delete_program_button.pack(pady=5)
 
-    app.select_program_button = tk.Button(program_button_frame, text="Выбрать образовательную программу", command=lambda: confirm_program_selection(app))
+    app.select_program_button = tk.Button(program_frame, text="Выбрать образовательную программу", command=lambda: confirm_program_selection(app))
     app.select_program_button.pack(pady=5)
 
     # Поле для отображения выбранной образовательной программы
@@ -93,23 +101,27 @@ def create_add_program_window(root, app):
     competence_frame = tk.Frame(main_frame)
     competence_frame.pack(pady=5, fill="x", expand=True)
 
-    # Фрейм для таблицы компетенций
-    competence_table_frame = ttk.LabelFrame(competence_frame, text="Добавить компетенции")
-    competence_table_frame.pack(pady=5, padx=5, fill="x", expand=True)
+    # Фрейм для таблицы компетенций и кнопок
+    competence_container = tk.Frame(competence_frame)
+    competence_container.pack(pady=5, fill="x", expand=True)
 
-    # Таблица для компетенций (высота 200 пикселей)
-    app.competence_table_add = ttk.Treeview(competence_table_frame, columns=("competence", "type"), show="headings", height=2)
+    # Фрейм для таблицы компетенций
+    competence_table_frame = ttk.LabelFrame(competence_container, text="Добавить компетенции")
+    competence_table_frame.pack(side=tk.LEFT, pady=5, padx=5, fill="both", expand=True)
+
+    # Таблица для компетенций (уменьшенная ширина)
+    app.competence_table_add = ttk.Treeview(competence_table_frame, columns=("competence", "type"), show="headings", height=6)
     app.competence_table_add.heading("competence", text="Компетенция")
     app.competence_table_add.heading("type", text="Вид компетенции")
-    app.competence_table_add.column("competence", width=400)
-    app.competence_table_add.column("type", width=300)
-    app.competence_table_add.pack(pady=5, fill="x", expand=False)
+    app.competence_table_add.column("competence", width=300)  # Уменьшена ширина
+    app.competence_table_add.column("type", width=200)
+    app.competence_table_add.pack(pady=5, fill="both", expand=True)
 
-    # Фрейм для кнопок компетенций (под таблицей)
-    competence_button_frame = tk.Frame(competence_frame)
-    competence_button_frame.pack(pady=5, padx=5)
+    # Фрейм для кнопок компетенций (справа)
+    competence_button_frame = tk.Frame(competence_container)
+    competence_button_frame.pack(side=tk.LEFT, padx=5, pady=5, fill="y")
 
-    # Кнопки для компетенций в порядке: Добавить, Редактировать, Удалить
+    # Кнопки для компетенций
     app.add_competence_button = tk.Button(competence_button_frame, text="Добавить", command=lambda: add_new_competence(app, add_window))
     app.add_competence_button.pack(pady=5)
 
