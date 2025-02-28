@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 import logging
 from .add_program_window import create_add_program_window
+from .competence_utils import update_competence_table
 
 def create_education_tab(frame, app):
     """Создание вкладки для образовательных программ."""
@@ -52,9 +53,7 @@ def create_education_tab(frame, app):
     app.load_education_table()
 
     # Привязываем событие выбора строки в верхней таблице для предварительного отображения компетенций
-    app.education_table.bind("<<TreeviewSelect>>", lambda event: app.preview_competences())
-
-    # Кнопка "Добавить образовательную программу"
+    app.education_table.bind("<<TreeviewSelect>>", lambda event: update_competence_table(app, app._get_program_id_from_table(app.education_table.item(app.education_table.selection()[0])['values'] if app.education_table.selection() else None)))    # Кнопка "Добавить образовательную программу"
     app.add_program_button = tk.Button(frame, text="Добавить образовательную программу", command=lambda: create_add_program_window(app.root, app))
     app.add_program_button.pack(pady=10)
     
@@ -76,12 +75,34 @@ def preview_competences(self):
         program_name, program_code = values[0], values[1]  # Наименование и код ОП
         program_id = self._get_program_id_from_table(values)
         if program_id:
-            competences = self.logic.db.fetch_program_details(program_id)
-            self.competence_table.delete(*self.competence_table.get_children())
-            for competence in competences:
-                competence_name, competence_type = competence[5], competence[6]  # competence_name, type_competence_full_name
-                if competence_name:  # Убедимся, что компетенция существует
-                    self.competence_table.insert("", tk.END, values=(competence_name, competence_type or "Неизвестно"))
+            # Удаляем старую таблицу и фрейм, если они существуют
+            if hasattr(self, 'competence_frame') and self.competence_frame.winfo_exists():
+                self.competence_frame.destroy()
+            # Проверяем наличие и валидность competence_table
+            if not hasattr(self, 'competence_table') or not self.competence_table.winfo_exists():
+                logging.warning("Таблица компетенций недоступна или не существует. Выполняется инициализация.")
+                self.competence_frame = ttk.LabelFrame(self.education_tab, text="Компетенции программы")
+                self.competence_frame.pack(pady=5, padx=5, fill="both", expand=True)
+                self.competence_table = ttk.Treeview(self.competence_frame, columns=("competence", "competence_type"), show="headings", height=10)
+                self.competence_table.heading("competence", text="Компетенция")
+                self.competence_table.heading("competence_type", text="Вид компетенции")
+                self.competence_table.column("competence", width=400)
+                self.competence_table.column("competence_type", width=300)
+                self.competence_table.pack(pady=5, fill="both", expand=True)
+            # Обновляем данные в существующей таблице
+            if hasattr(self, 'competence_table') and self.competence_table.winfo_exists():
+                self.competence_table.delete(*self.competence_table.get_children())
+                competences = self.logic.db.fetch_program_details(program_id)
+                for competence in competences:
+                    competence_name, competence_type = competence[5], competence[6]  # competence_name, type_competence_full_name
+                    if competence_name:
+                        self.competence_table.insert("", tk.END, values=(competence_name, competence_type or "Неизвестно"))
+            else:
+                logging.error("Не удалось восстановить таблицу компетенций.")
+        else:
+            logging.error(f"Не удалось найти ID для программы: {program_name}, код: {program_code}")
+    else:
+        self.show_error("Выберите строку в таблице!")
 
 def on_table_select(self):
     """Обработка выбора образовательной программы из таблицы."""
@@ -93,7 +114,8 @@ def on_table_select(self):
         program_id = self._get_program_id_from_table(values)
         self.program_id = program_id  # Сохраняем ID для использования в start_analysis
         logging.info(f"Выбрана программа с наименованием: {program_name}, ID: {program_id}")
-        self.preview_competences()
+        from .competence_utils import update_competence_table
+        update_competence_table(self, program_id)
     else:
         self.show_error("Выберите строку в таблице!")
 

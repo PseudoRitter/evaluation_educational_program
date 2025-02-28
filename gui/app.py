@@ -33,6 +33,10 @@ class App:
         self.education_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.education_tab, text="ОП")
         create_education_tab(self.education_tab, self)
+        # Привязываем событие переключения вкладок для обновления таблицы
+        self.notebook.bind("<<NotebookTabChanged>>", lambda event: self.load_education_table() if self.notebook.tab(self.notebook.select())['text'] == "ОП" else None)
+                # Обработчик события для обновления таблицы компетенций
+        self.root.bind("<<UpdateCompetences>>", lambda event: self.preview_competences() if self.notebook.tab(self.notebook.select())['text'] == "ОП" else None)
 
         # Вкладка "Вакансии"
         self.vacancies_tab = ttk.Frame(self.notebook)
@@ -48,6 +52,13 @@ class App:
         self.assessment_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.assessment_tab, text="Оценки")
         create_assessment_tab(self.assessment_tab, self)
+
+    def _restore_competence_table(self):
+        """Восстановление таблицы компетенций, если она недоступна."""
+        if not hasattr(self, 'competence_table') or not self.competence_table.winfo_exists():
+            logging.warning("Восстанавливаем таблицу компетенций.")
+            from .education_tab import create_education_tab
+            create_education_tab(self.education_tab, self)  # Пересоздаём вкладку для восстановления
 
     def load_programs(self):
         """Загрузка списка образовательных программ из БД (для совместимости, если нужно)."""
@@ -196,16 +207,30 @@ class App:
             program_name, program_code = values[0], values[1]  # Наименование и код ОП
             program_id = self._get_program_id_from_table(values)
             if program_id:
-                if hasattr(self, 'competence_table') and self.competence_table:
-                    # Очищаем таблицу компетенций, если она существует
+                # Удаляем старую таблицу и фрейм, если они существуют
+                if hasattr(self, 'competence_frame') and self.competence_frame.winfo_exists():
+                    self.competence_frame.destroy()
+                # Проверяем наличие и валидность competence_table
+                if not hasattr(self, 'competence_table') or not self.competence_table.winfo_exists():
+                    logging.warning("Таблица компетенций недоступна или не существует. Выполняется инициализация.")
+                    self.competence_frame = ttk.LabelFrame(self.education_tab, text="Компетенции программы")
+                    self.competence_frame.pack(pady=5, padx=5, fill="both", expand=True)
+                    self.competence_table = ttk.Treeview(self.competence_frame, columns=("competence", "competence_type"), show="headings", height=10)
+                    self.competence_table.heading("competence", text="Компетенция")
+                    self.competence_table.heading("competence_type", text="Вид компетенции")
+                    self.competence_table.column("competence", width=400)
+                    self.competence_table.column("competence_type", width=300)
+                    self.competence_table.pack(pady=5, fill="both", expand=True)
+                # Обновляем данные в существующей таблице
+                if hasattr(self, 'competence_table') and self.competence_table.winfo_exists():
                     self.competence_table.delete(*self.competence_table.get_children())
                     competences = self.logic.db.fetch_program_details(program_id)
                     for competence in competences:
                         competence_name, competence_type = competence[5], competence[6]  # competence_name, type_competence_full_name
-                        if competence_name:  # Убедимся, что компетенция существует
+                        if competence_name:
                             self.competence_table.insert("", tk.END, values=(competence_name, competence_type or "Неизвестно"))
                 else:
-                    logging.error("Таблица компетенций не инициализирована или недоступна.")
+                    logging.error("Не удалось восстановить таблицу компетенций.")
             else:
                 logging.error(f"Не удалось найти ID для программы: {program_name}, код: {program_code}")
         else:

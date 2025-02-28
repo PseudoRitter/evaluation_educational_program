@@ -22,7 +22,7 @@ def create_add_program_window(root, app):
     university_table_frame.pack(pady=5, padx=5, fill="x", expand=True)
 
     # Таблица для ВУЗов (высота 200 пикселей)
-    app.university_table = ttk.Treeview(university_table_frame, columns=("full_name", "short_name", "city"), show="headings", height=6)
+    app.university_table = ttk.Treeview(university_table_frame, columns=("full_name", "short_name", "city"), show="headings", height=2)
     app.university_table.heading("full_name", text="Наименование ВУЗа")
     app.university_table.heading("short_name", text="Сокращение")
     app.university_table.heading("city", text="Город")
@@ -54,7 +54,7 @@ def create_add_program_window(root, app):
     program_table_frame.pack(pady=5, padx=5, fill="x", expand=True)
 
     # Таблица для образовательных программ (высота 200 пикселей)
-    app.program_table = ttk.Treeview(program_table_frame, columns=("name", "code", "year", "university_short", "type"), show="headings", height=6)
+    app.program_table = ttk.Treeview(program_table_frame, columns=("name", "code", "year", "university_short", "type"), show="headings", height=2)
     app.program_table.heading("name", text="Наименование ОП")
     app.program_table.heading("code", text="Код ОП")
     app.program_table.heading("year", text="Год ОП")
@@ -98,12 +98,12 @@ def create_add_program_window(root, app):
     competence_table_frame.pack(pady=5, padx=5, fill="x", expand=True)
 
     # Таблица для компетенций (высота 200 пикселей)
-    app.competence_table = ttk.Treeview(competence_table_frame, columns=("competence", "type"), show="headings", height=6)
-    app.competence_table.heading("competence", text="Компетенция")
-    app.competence_table.heading("type", text="Вид компетенции")
-    app.competence_table.column("competence", width=400)
-    app.competence_table.column("type", width=300)
-    app.competence_table.pack(pady=5, fill="x", expand=False)
+    app.competence_table_add = ttk.Treeview(competence_table_frame, columns=("competence", "type"), show="headings", height=2)
+    app.competence_table_add.heading("competence", text="Компетенция")
+    app.competence_table_add.heading("type", text="Вид компетенции")
+    app.competence_table_add.column("competence", width=400)
+    app.competence_table_add.column("type", width=300)
+    app.competence_table_add.pack(pady=5, fill="x", expand=False)
 
     # Фрейм для кнопок компетенций (под таблицей)
     competence_button_frame = tk.Frame(competence_frame)
@@ -164,11 +164,11 @@ def load_competence_table(app, program_id):
     try:
         if program_id:
             competences = app.logic.db.fetch_competences_for_program(program_id)
-            app.competence_table.delete(*app.competence_table.get_children())
+            app.competence_table_add.delete(*app.competence_table_add.get_children())
             for competence in competences:
-                app.competence_table.insert("", tk.END, values=competence)
+                app.competence_table_add.insert("", tk.END, values=competence)
         else:
-            app.competence_table.delete(*app.competence_table.get_children())
+            app.competence_table_add.delete(*app.competence_table_add.get_children())
     except Exception as e:
         logging.error(f"Ошибка при загрузке компетенций в таблицу: {e}")
 
@@ -524,7 +524,7 @@ def select_program(app, parent_window):
     select_window.geometry("500x400")
 
     # Таблица для выбора образовательной программы
-    program_select_table = ttk.Treeview(select_window, columns=("name", "code", "year", "university_short", "type"), show="headings", height=6)
+    program_select_table = ttk.Treeview(select_window, columns=("name", "code", "year", "university_short", "type"), show="headings", height=4)
     program_select_table.heading("name", text="Наименование ОП")
     program_select_table.heading("code", text="Код ОП")
     program_select_table.heading("year", text="Год ОП")
@@ -559,9 +559,10 @@ def confirm_program_selection(app):
     program_id = app.logic.db.fetch_program_id_by_name_and_code(name, code)
     if program_id:
         app.selected_program_label.config(text=f"Выбрана программа: {name}")
-        app.selected_program_id = program_id[0]  # Сохраняем ID выбранной программы для использования при добавлении компетенций
+        app.selected_program_id = program_id[0]  # Сохраняем ID выбранной программы
         logging.info(f"Выбрана программа: {name}, ID: {program_id[0]}")
-        load_competence_table(app, app.selected_program_id)  # Обновляем таблицу компетенций для выбранной программы
+        from .competence_utils import update_competence_table
+        update_competence_table(app, program_id[0], table_name="competence_table_add")  # Обновляем таблицу в основном окне
         delattr(app, 'temp_selected_program')  # Очищаем временное значение
     else:
         logging.error(f"Не удалось найти ID для программы: {name}, код: {code}")
@@ -616,27 +617,28 @@ def save_new_competence(app, window, parent_window, competence_entry, type_var):
 
         # Сохраняем связь с образовательной программой
         if app.logic.db.save_competence_for_program(competence_id, type_competence_id, app.selected_program_id):
-            # Обновляем таблицу компетенций
-            load_competence_table(app, app.selected_program_id)
+            # Обновляем таблицу компетенций в основном окне
+            from .competence_utils import update_competence_table
+            update_competence_table(app, app.selected_program_id, table_name="competence_table_add")
             logging.info(f"Компетенция '{competence_name}' успешно добавлена к программе!")
             window.destroy()  # Закрываем окно добавления компетенции
         else:
             logging.error("Не удалось добавить компетенцию к программе. Проверь данные.")
     except Exception as e:
         logging.error(f"Ошибка при сохранении компетенции: {e}")
-
+        
 def edit_competence(app, parent_window):
     """Открытие окна для редактирования выбранной компетенции."""
     if not hasattr(app, 'selected_program_id') or not app.selected_program_id:
         logging.error("Сначала выберите образовательную программу!")
         return
 
-    selected_item = app.competence_table.selection()
+    selected_item = app.competence_table_add.selection()
     if not selected_item:
         logging.error("Выберите компетенцию в таблице для редактирования!")
         return
 
-    values = app.competence_table.item(selected_item[0])['values']
+    values = app.competence_table_add.item(selected_item[0])['values']
     competence_name, competence_type_name = values  # Текущие данные компетенции
 
     edit_window = tk.Toplevel(parent_window)
@@ -679,39 +681,39 @@ def save_edited_competence(app, window, parent_window, competence_entry, type_va
         # Проверяем или создаём новую компетенцию
         new_competence = app.logic.db.fetch_competence_by_name(new_competence_name)
         if not new_competence:
-            # Если компетенции нет, создаём новую
             new_type_competence = app.logic.db.fetch_competence_types()
-            new_type_competence_id = next((t[0] for t in new_type_competence if t[1] == new_competence_type_name), None)
-            if not new_type_competence_id:
+            new_type_id = next((t[0] for t in new_type_competence if t[1] == new_competence_type_name), None)
+            if not new_type_id:
                 logging.error(f"Не найден тип компетенции '{new_competence_type_name}'. Проверь данные.")
                 return
-            new_competence_id = app.logic.db.save_competence(new_competence_name, new_type_competence_id)
+            new_competence_id = app.logic.db.save_competence(new_competence_name, new_type_id)
         else:
-            new_competence_id, _, new_type_competence_id = new_competence  # Извлекаем new_type_competence_id из существующей компетенции
+            new_competence_id, _, new_type_competence_id = new_competence
 
         # Обновляем связь с образовательной программой
         if app.logic.db.update_competence_for_program(old_competence_id, old_type_competence_id, app.selected_program_id, new_competence_id, new_type_competence_id):
-            # Обновляем таблицу компетенций
-            load_competence_table(app, app.selected_program_id)
+            # Обновляем таблицу компетенций в основном окне
+            from .competence_utils import update_competence_table
+            update_competence_table(app, app.selected_program_id, table_name="competence_table_add")
             logging.info(f"Компетенция обновлена: {new_competence_name}")
             window.destroy()  # Закрываем окно редактирования компетенции
         else:
             logging.error("Не удалось обновить компетенцию. Проверь данные.")
     except Exception as e:
         logging.error(f"Ошибка при редактировании компетенции: {e}")
-        
+
 def delete_competence(app, parent_window):
     """Удаление выбранной компетенции из связи с образовательной программой."""
     if not hasattr(app, 'selected_program_id') or not app.selected_program_id:
         logging.error("Сначала выберите образовательную программу!")
         return
 
-    selected_item = app.competence_table.selection()
+    selected_item = app.competence_table_add.selection()
     if not selected_item:
         logging.error("Выберите компетенцию в таблице для удаления!")
         return
 
-    values = app.competence_table.item(selected_item[0])['values']
+    values = app.competence_table_add.item(selected_item[0])['values']
     competence_name, competence_type_name = values  # Данные компетенции
 
     try:
@@ -723,8 +725,9 @@ def delete_competence(app, parent_window):
 
         # Удаляем связь с образовательной программой
         if app.logic.db.delete_competence_for_program(competence_id, type_competence_id, app.selected_program_id):
-            # Обновляем таблицу компетенций
-            load_competence_table(app, app.selected_program_id)
+            # Обновляем таблицу компетенций в основном окне
+            from .competence_utils import update_competence_table
+            update_competence_table(app, app.selected_program_id, table_name="competence_table_add")
             logging.info(f"Компетенция '{competence_name}' удалена из программы!")
         else:
             logging.error("Не удалось удалить компетенцию из программы. Проверь данные.")
