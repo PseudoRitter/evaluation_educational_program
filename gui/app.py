@@ -34,8 +34,8 @@ class App:
         self.notebook.add(self.education_tab, text="ОП")
         create_education_tab(self.education_tab, self)
         # Привязываем событие переключения вкладок для обновления таблицы
-        self.notebook.bind("<<NotebookTabChanged>>", lambda event: self.load_education_table() if self.notebook.tab(self.notebook.select())['text'] == "ОП" else None)
-                # Обработчик события для обновления таблицы компетенций
+        self.notebook.bind("<<NotebookTabChanged>>", lambda event: load_education_table(self) if self.notebook.tab(self.notebook.select())['text'] == "ОП" else None)
+        # Обработчик события для обновления таблицы компетенций
         self.root.bind("<<UpdateCompetences>>", lambda event: self.preview_competences() if self.notebook.tab(self.notebook.select())['text'] == "ОП" else None)
 
         # Вкладка "Вакансии"
@@ -132,11 +132,9 @@ class App:
                 torch.cuda.empty_cache()
 
     def show_error(self, message):
-        messagebox.showerror("Ошибка", message)
         logging.error(f"GUI Error: {message}")
 
     def show_info(self, message):
-        messagebox.showinfo("Информация", message)
         logging.info(f"GUI Info: {message}")
 
     def update_results(self, results):
@@ -184,85 +182,3 @@ class App:
         if re.match(r'^[0-9a-fA-F]*$', possible_new_value):
             return True
         return False
-
-    def load_education_table(self):
-        """Загрузка данных образовательных программ в таблицу из БД."""
-        try:
-            programs = self.logic.db.fetch_educational_programs_with_details()
-            logging.debug(f"Loaded programs: {programs}")  # Отладочный лог для проверки данных
-            self.education_table.delete(*self.education_table.get_children())  # Очищаем таблицу
-            for program in programs:
-                # Изменяем отображение года, чтобы показывать только год как текст (например, "2025")
-                year = program[2] if program[2] else ""  # Берем год как есть
-                self.education_table.insert("", tk.END, values=(program[0], program[1], year, program[3], program[4]))
-        except Exception as e:
-            logging.error(f"Ошибка при загрузке образовательных программ в таблицу: {e}")
-            self.show_error(f"Не удалось загрузить программы: {e}")
-
-    def preview_competences(self):
-        """Предварительное отображение компетенций выбранной программы при выборе строки в таблице."""
-        selected_item = self.education_table.selection()
-        if selected_item:
-            values = self.education_table.item(selected_item[0])['values']
-            program_name, program_code = values[0], values[1]  # Наименование и код ОП
-            program_id = self._get_program_id_from_table(values)
-            if program_id:
-                # Удаляем старую таблицу и фрейм, если они существуют
-                if hasattr(self, 'competence_frame') and self.competence_frame.winfo_exists():
-                    self.competence_frame.destroy()
-                # Проверяем наличие и валидность competence_table
-                if not hasattr(self, 'competence_table') or not self.competence_table.winfo_exists():
-                    logging.warning("Таблица компетенций недоступна или не существует. Выполняется инициализация.")
-                    self.competence_frame = ttk.LabelFrame(self.education_tab, text="Компетенции программы")
-                    self.competence_frame.pack(pady=5, padx=5, fill="both", expand=True)
-                    self.competence_table = ttk.Treeview(self.competence_frame, columns=("competence", "competence_type"), show="headings", height=10)
-                    self.competence_table.heading("competence", text="Компетенция")
-                    self.competence_table.heading("competence_type", text="Вид компетенции")
-                    self.competence_table.column("competence", width=400)
-                    self.competence_table.column("competence_type", width=300)
-                    self.competence_table.pack(pady=5, fill="both", expand=True)
-                # Обновляем данные в существующей таблице
-                if hasattr(self, 'competence_table') and self.competence_table.winfo_exists():
-                    self.competence_table.delete(*self.competence_table.get_children())
-                    competences = self.logic.db.fetch_program_details(program_id)
-                    for competence in competences:
-                        competence_name, competence_type = competence[5], competence[6]  # competence_name, type_competence_full_name
-                        if competence_name:
-                            self.competence_table.insert("", tk.END, values=(competence_name, competence_type or "Неизвестно"))
-                else:
-                    logging.error("Не удалось восстановить таблицу компетенций.")
-            else:
-                logging.error(f"Не удалось найти ID для программы: {program_name}, код: {program_code}")
-        else:
-            self.show_error("Выберите строку в таблице!")
-
-    def on_table_select(self):
-        """Обработка выбора образовательной программы из таблицы."""
-        selected_item = self.education_table.selection()
-        if selected_item:
-            values = self.education_table.item(selected_item[0])['values']
-            program_name, program_code = values[0], values[1]  # Наименование и код ОП
-            logging.debug(f"Selected program: name={program_name}, code={program_code}")  # Отладочный лог
-            program_id = self._get_program_id_from_table(values)
-            if program_id:
-                self.selected_program_label.config(text=f"Выбрана программа: {program_name}")
-                self.program_id = program_id  # Сохраняем ID для использования в start_analysis
-                logging.info(f"Выбрана программа с наименованием: {program_name}, ID: {program_id}")
-                self.preview_competences()
-            else:
-                logging.error(f"Не удалось найти ID для программы: {program_name}, код: {program_code}")
-                self.show_error("Не удалось определить ID программы. Проверь данные в БД.")
-        else:
-            self.show_error("Выберите строку в таблице!")
-
-    def _get_program_id_from_table(self, values):
-        """Получение program_id на основе данных из таблицы."""
-        try:
-            name, code = values[0], values[1]  # Наименование и код ОП
-            logging.debug(f"Fetching program_id for name: {name}, code: {code}")  # Отладочный лог
-            query_result = self.logic.db.fetch_program_id_by_name_and_code(name, code)
-            logging.debug(f"Query result: {query_result}")  # Отладочный лог результата запроса
-            return query_result[0] if query_result else None
-        except Exception as e:
-            logging.error(f"Ошибка при получении ID программы: {e}")
-            return None

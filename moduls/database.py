@@ -193,6 +193,7 @@ class Database:
             # Убедимся, что name и code — это строки, и уберём лишние пробелы
             name = str(name).strip() if name is not None else ""
             code = str(code).strip() if code is not None else ""
+            logging.debug(f"Fetching program_id with name: '{name}', code: '{code}'")
 
             query = """
                 SELECT educational_program_id
