@@ -30,7 +30,7 @@ class Logic:
             "host": "localhost",
             "port": "5432"
         }
-        self.db = Database(self.db_params, data_dir="vacancies")
+        self.db = Database(self.db_params, data_dir="vacancies_hh")#путь к хранению вакансий
 
     def load_vacancies_from_db(self):
         """Получение списка вакансий из БД для отображения в интерфейсе."""
@@ -49,7 +49,7 @@ class Logic:
             vacancy = self.db.fetch_vacancy_details(vacancy_id)
             if not vacancy:
                 return None
-            file_path = vacancy[1]  # vacancy_file — путь к JSON
+            file_path = vacancy[3]  # vacancy_file — путь к JSON 
             description = self.db.load_vacancy_from_file(file_path)
             if description:
                 return description

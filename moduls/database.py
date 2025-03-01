@@ -52,7 +52,7 @@ class Database:
         """Получение списка вакансий из БД с путями к JSON-файлам."""
         try:
             query = """
-                SELECT vacancy_id, vacancy_name, vacancy_file
+                SELECT vacancy_id, vacancy_name, vacancy_num, vacancty_date, vacancy_file
                 FROM vacancy
                 ORDER BY vacancy_name;
             """
@@ -91,12 +91,15 @@ class Database:
         """Получение деталей вакансии, включая путь к JSON-файлу."""
         try:
             query = """
-                SELECT vacancy_name, vacancy_file
+                SELECT vacancy_name, vacancy_num, vacancty_date, vacancy_file
                 FROM vacancy
                 WHERE vacancy_id = %s;
             """
             self.cursor.execute(query, (vacancy_id,))
-            return self.cursor.fetchone()
+            result = self.cursor.fetchone()
+            if result:
+                return result  # Убедимся, что vacancy_file (result[3]) — строка
+            return None
         except Error as e:
             logging.error(f"Ошибка при получении деталей вакансии: {e}")
             return None
@@ -104,24 +107,28 @@ class Database:
     def load_vacancy_from_file(self, file_path):
         """Загрузка данных вакансии из JSON-файла по указанному пути."""
         try:
-            full_path = os.path.join(self.data_dir, file_path)
+            full_path = os.path.join(self.data_dir, str(file_path))
+            logging.debug(f"Попытка загрузки файла: {full_path}")
             if not os.path.exists(full_path):
                 logging.error(f"Файл вакансии не найден: {full_path}")
-                return None
+                raise FileNotFoundError(f"Файл вакансии не найден: {full_path}")
             with open(full_path, 'r', encoding='utf-8') as f:
                 vacancy_data = json.load(f)
-            # Предполагаем, что JSON — это список вакансий, берём первую (или все, если нужно)
             if isinstance(vacancy_data, list):
                 for vacancy in vacancy_data:
                     if 'full_description' in vacancy:
+                        logging.debug(f"Найдено 'full_description': {vacancy['full_description'][:100]}...")
                         return vacancy['full_description']
+                logging.warning(f"Поле 'full_description' не найдено в списке вакансий: {full_path}")
+                return ''
             elif isinstance(vacancy_data, dict) and 'full_description' in vacancy_data:
+                logging.debug(f"Найдено 'full_description': {vacancy_data['full_description'][:100]}...")
                 return vacancy_data['full_description']
-            logging.warning(f"Не найдено поле 'full_description' в файле: {full_path}")
+            logging.warning(f"Поле 'full_description' не найдено в файле: {full_path}")
             return ''
         except (json.JSONDecodeError, Exception) as e:
             logging.error(f"Ошибка при загрузке JSON-файла вакансии: {e}")
-            return ''
+            raise  # Передаём ошибку выше для более точной обработки
 
     def save_educational_program(self, name, code, university_id, year, type_program_id, competences):
         """Сохранение новой образовательной программы в БД."""
@@ -331,7 +338,7 @@ class Database:
             self.cursor.execute(query, (type_name,))
             return self.cursor.fetchone()
         except Error as e:
-            logging.error(f"Ошибка при получении ID типа программы: {e}")
+            logging.error(f"Ошибка при получения ID типа программы: {e}")
             return None
 
     def update_educational_program(self, program_id, name, code, university_id, year, type_program_id):
@@ -527,41 +534,70 @@ class Database:
             logging.error(f"Ошибка при удалении связи компетенции с программой: {e}")
             self.connection.rollback()
             return False
-
-# Пример использования с твоими параметрами
-if __name__ == "__main__":
-    db_params = {
-        "database": "postgres",
-        "user": "postgres",
-        "password": "1111",
-        "host": "localhost",
-        "port": "5432"
-    }
-
-    db = Database(db_params, data_dir="vacancies")
-    try:
-        # Пример получения данных
-        programs = db.fetch_educational_programs()
-        for program in programs:
-            print(program)
         
-        vacancies = db.fetch_vacancies()
-        for vacancy in vacancies:
-            print(vacancy)
-            # Пример загрузки данных из JSON
-            description = db.load_vacancy_from_file(vacancy[2])  # vacancy_file — путь
-            print(f"Описание вакансии: {description}")
+    def update_vacancy(self, vacancy_id, name, num, date, file_path):
+        """Обновление данных вакансии в БД."""
+        try:
+            query = """
+                UPDATE vacancy
+                SET vacancy_name = %s, vacancy_num = %s, vacancty_date = %s, vacancy_file = %s
+                WHERE vacancy_id = %s;
+            """
+            self.cursor.execute(query, (name, num, date, file_path, vacancy_id))
+            self.connection.commit()
+            return True
+        except Error as e:
+            logging.error(f"Ошибка при обновлении вакансии: {e}")
+            self.connection.rollback()
+            return False
+        
 
-        universities = db.fetch_universities()
-        for university in universities:
-            print(university)
+    def fetch_vacancy_id_by_details(self, name, quantity, date, file_path):
+        try:
+            query = """
+                SELECT vacancy_id
+                FROM vacancy
+                WHERE vacancy_name = %s AND vacancy_num = %s AND vacancty_date = %s AND vacancy_file = %s;
+            """
+            self.cursor.execute(query, (name, int(quantity), date, file_path))
+            return self.cursor.fetchone()
+        except ValueError as ve:
+            logging.error(f"Неверный формат данных для quantity: {ve}")
+            return None
+        except Error as e:
+            logging.error(f"Ошибка при получении ID вакансии: {e}")
+            return None
 
-        program_types = db.fetch_educational_program_types()
-        for program_type in program_types:
-            print(program_type)
+    def update_vacancy(self, vacancy_id, name, quantity, date, file_path):
+        """Обновление данных вакансии в БД."""
+        try:
+            query = """
+                UPDATE vacancy
+                SET vacancy_name = %s, vacancy_num = %s, vacancty_date = %s, vacancy_file = %s
+                WHERE vacancy_id = %s;
+            """
+            self.cursor.execute(query, (str(name), int(quantity), date, file_path, vacancy_id))
+            self.connection.commit()
+            return True
+        except ValueError as ve:
+            logging.error(f"Неверный формат данных для quantity: {ve}")
+            self.connection.rollback()
+            return False
+        except Error as e:
+            logging.error(f"Ошибка при обновлении вакансии: {e}")
+            self.connection.rollback()
+            return False
 
-        competence_types = db.fetch_competence_types()
-        for competence_type in competence_types:
-            print(competence_type)
-    finally:
-        db.disconnect()
+    def delete_vacancy(self, vacancy_id):
+        """Удаление вакансии из БД."""
+        try:
+            query = """
+                DELETE FROM vacancy WHERE vacancy_id = %s;
+            """
+            self.cursor.execute(query, (vacancy_id,))
+            self.connection.commit()
+            return True
+        except Error as e:
+            logging.error(f"Ошибка при удалении вакансии: {e}")
+            self.connection.rollback()
+            return False

@@ -1,8 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 import logging
-from .add_program_window import create_add_program_window
-from .update_table import update_competence_table
+from .add_program_window import create_add_program_window, update_competence_table  # Обновлён импорт
 
 def create_education_tab(frame, app):
     """Создание вкладки для образовательных программ."""
@@ -18,12 +17,7 @@ def create_education_tab(frame, app):
     education_table_frame.pack(pady=5, padx=5, fill="both", expand=True)
 
     # Таблица образовательных программ
-    app.education_table = ttk.Treeview(
-        education_table_frame, 
-        columns=("name", "code", "year", "university_short", "type"), 
-        show="headings", 
-        height=8
-    )
+    app.education_table = ttk.Treeview( education_table_frame, columns=("name", "code", "year", "university_short", "type"), show="headings", height=8 )
     app.education_table.heading("name", text="Наименование ОП")
     app.education_table.heading("code", text="Код ОП")
     app.education_table.heading("year", text="Год ОП")
@@ -122,6 +116,7 @@ def preview_competences(app):
             app.competence_table.insert("", tk.END, values=(competence_name, competence_type or "Неизвестно"))
 
 def on_table_select(app):
+    """Обработка выбора образовательной программы из таблицы."""
     selected_item = app.education_table.selection()
     if not selected_item:
         app.show_error("Выберите строку в таблице!")

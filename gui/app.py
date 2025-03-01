@@ -5,6 +5,7 @@ from .vacancies_tab import create_vacancies_tab
 from .debug_tab import create_debug_tab
 from .assessment_tab import create_assessment_tab
 from .add_program_window import create_add_program_window
+from .rating_history_tab import create_rating_history_tab  # Новый импорт
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import re
@@ -15,14 +16,15 @@ from concurrent.futures import ThreadPoolExecutor
 class App:
     def __init__(self, root, logic):
         self.root = root
-        self.logic = logic  # Логика приложения
+        self.logic = logic
         self.root.title("Оценка соответствия образовательной программы")
-        self.root.geometry("1100x800")  # Увеличиваем размер окна для нового поля
+        self.root.geometry("1100x800")
+        self.program_id = None
+        self.selected_vacancy_id = None  # Явно устанавливаем None
         self.create_widgets()
         self.executor = ThreadPoolExecutor(max_workers=1)
-        self.load_programs()  # Загружаем список программ из БД при инициализации (для совместимости, если нужно)
-        self.load_vacancies()  # Загружаем список вакансий из БД
-        self.program_id = None  # Инициализируем program_id
+        self.load_programs()
+        self.load_vacancies()
 
     def create_widgets(self):
         # Создаем Notebook для вкладок
@@ -32,11 +34,15 @@ class App:
         # Вкладка "ОП"
         self.education_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.education_tab, text="ОП")
+        from .education_tab import create_education_tab, on_table_select, load_education_table, preview_competences
         create_education_tab(self.education_tab, self)
-        # Привязываем событие переключения вкладок для обновления таблицы
+        # Привязываем кнопку "Выбрать" к методу on_table_select из education_tab
+        self.select_button = tk.Button(self.education_tab, text="Выбрать", command=lambda: on_table_select(self))
+        self.select_button.pack(pady=5)
+        # Привязываем событие переключения вкладок
         self.notebook.bind("<<NotebookTabChanged>>", lambda event: load_education_table(self) if self.notebook.tab(self.notebook.select())['text'] == "ОП" else None)
         # Обработчик события для обновления таблицы компетенций
-        self.root.bind("<<UpdateCompetences>>", lambda event: self.preview_competences() if self.notebook.tab(self.notebook.select())['text'] == "ОП" else None)
+        self.root.bind("<<UpdateCompetences>>", lambda event: preview_competences(self) if self.notebook.tab(self.notebook.select())['text'] == "ОП" else None)
 
         # Вкладка "Вакансии"
         self.vacancies_tab = ttk.Frame(self.notebook)
@@ -53,6 +59,11 @@ class App:
         self.notebook.add(self.assessment_tab, text="Оценки")
         create_assessment_tab(self.assessment_tab, self)
 
+        # Вкладка "История оценок"
+        self.rating_history_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.rating_history_tab, text="История оценок")
+        create_rating_history_tab(self.rating_history_tab, self)
+        
     def _restore_competence_table(self):
         """Восстановление таблицы компетенций, если она недоступна."""
         if not hasattr(self, 'competence_table') or not self.competence_table.winfo_exists():
@@ -73,13 +84,12 @@ class App:
     def load_vacancies(self):
         """Загрузка списка вакансий из БД."""
         try:
-            vacancies = self.logic.load_vacancies_from_db()
-            logging.debug(f"Vacancies from DB: {vacancies}")  # Отладочный лог для проверки данных
-            vacancy_list = [f"{v[1]} (ID: {v[0]})" for v in vacancies]  # Формат: "Название (ID)"
-            self.vacancy_combobox['values'] = vacancy_list
-            logging.info(f"Загружено {len(vacancy_list)} вакансий из БД")
-            if vacancy_list:
-                self.vacancy_combobox.set(vacancy_list[0])  # Устанавливаем значение по умолчанию
+            vacancies = self.logic.db.fetch_vacancies()
+            logging.info(f"Загружено {len(vacancies)} вакансий из БД")
+            # Удаляем автоматический выбор
+            # if vacancies:
+            #     self.selected_vacancy_id = vacancies[0][0]
+            #     self.selected_vacancy_label.config(text=f"Выбрана вакансия: {vacancies[0][1]} (ID: {vacancies[0][0]})")
         except Exception as e:
             logging.error(f"Ошибка при загрузке вакансий из БД: {e}")
             self.show_error(f"Не удалось загрузить вакансии: {e}")
@@ -88,25 +98,23 @@ class App:
         """Обработка выбора программы из выпадающего списка (теперь не используется, но оставляем для совместимости)."""
         pass  # Этот метод больше не нужен, но оставлен для совместимости с текущей логикой
 
-    def on_vacancy_select(self, event):
-        """Обработка выбора вакансии из выпадающего списка."""
-        selected = self.vacancy_var.get()
-        if selected:
-            vacancy_id = int(selected.split("ID: ")[1].split(")")[0])  # Извлекаем ID из строки
-            logging.info(f"Выбрана вакансия с ID: {vacancy_id}")
+    # def on_vacancy_select(self, event):
+    #     """Обработка выбора вакансии из выпадающего списка."""
+    #     selected = self.vacancy_var.get()
+    #     if selected:
+    #         vacancy_id = int(selected.split("ID: ")[1].split(")")[0])  # Извлекаем ID из строки
+    #         logging.info(f"Выбрана вакансия с ID: {vacancy_id}")
 
     def start_analysis(self):
         try:
-            if not hasattr(self, 'program_id') or not self.vacancy_var.get():
+            if not hasattr(self, 'program_id') or not hasattr(self, 'selected_vacancy_id'):
                 self.show_error("Выберите образовательную программу и вакансию!")
                 return
 
             program_id = self.program_id
-            vacancy_selected = self.vacancy_var.get()
-            vacancy_id = int(vacancy_selected.split("ID: ")[1].split(")")[0])  # Извлекаем ID вакансии
+            vacancy_id = self.selected_vacancy_id
             batch_size = 64
 
-            # self.progress_bar.start(10)
             self.root.update_idletasks()
 
             future = self.executor.submit(
@@ -119,9 +127,12 @@ class App:
             self.show_error(f"Произошла ошибка: {e}")
 
     def on_analysis_complete(self, future):
-        # self.progress_bar.stop()
         try:
             results = future.result()
+            if results is None or 'similarity_results' not in results:
+                logging.error("Результаты анализа отсутствуют или некорректны")
+                self.show_error("Не удалось выполнить анализ: данные вакансии недоступны")
+                return
             self.update_results(results)
             self.update_classification_table(results["classification_results"])
         except Exception as e:
@@ -139,20 +150,21 @@ class App:
 
     def update_results(self, results):
         try:
+            if not results or 'similarity_results' not in results:
+                logging.error("Результаты анализа пусты или отсутствует 'similarity_results'")
+                self.show_error("Не удалось обновить результаты: данные недоступны")
+                return
             self.result_text_area.delete(1.0, tk.END)
             self.skill_results_table.delete(*self.skill_results_table.get_children())
             self.group_scores_area.delete(1.0, tk.END)
 
-            # Вывод результатов оценки компетенций в таблицу
             for skill, (score, ctype) in results["similarity_results"].items():
                 self.skill_results_table.insert("", tk.END, values=(skill, ctype, f"{score:.6f}"))
 
-            # Вывод оценок групп компетенций и общей оценки
             self.group_scores_area.insert(tk.END, "Оценки групп компетенций:\n")
             for ctype, score in results["group_scores"].items():
                 self.group_scores_area.insert(tk.END, f"{ctype}: {score:.6f}\n")
             self.group_scores_area.insert(tk.END, f"\nОбщая оценка программы: {results['overall_score']:.6f}\n")
-
         except Exception as e:
             logging.error(f"Ошибка в GUI (update_results): {e}", exc_info=True)
             self.show_error(f"Ошибка при обновлении результатов: {e}")
