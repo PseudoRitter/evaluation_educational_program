@@ -7,12 +7,12 @@ import numpy as np
 import gc
 import logging
 from moduls.export_to_excel import ExcelExporter
-from moduls.vacancy_loader import VacancyLoader
 from moduls.skill_matcher import SkillMatcher
 from moduls.text_preprocessor import TextPreprocessor
 from tkinter import filedialog, messagebox
 import traceback
 import os
+import json
 
 def cosine_similarity(vec1, vec2):
     return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
@@ -97,6 +97,22 @@ class Logic:
             return 0.0
         return np.mean(list(similarity_scores.values()))
 
+    def load_vacancy_descriptions_field(self, full_path):
+        """Загрузка описаний вакансий из JSON-файла."""
+        try:
+            with open(full_path, 'r', encoding='utf-8') as file:
+                vacancies = json.load(file)
+                return [vacancy.get('full_description', '') for vacancy in vacancies]
+        except FileNotFoundError as e:
+            logging.error(f"Файл не найден: {full_path} - {e}")
+            return []
+        except json.JSONDecodeError as e:
+            logging.error(f"Ошибка парсинга JSON в файле {full_path}: {e}")
+            return []
+        except Exception as e:
+            logging.error(f"Ошибка при загрузке описаний из {full_path}: {e}")
+            return []
+
     def run_analysis(self, program_id, vacancy_id, gui, batch_size=64):
         try:
             # Устанавливаем имя файла из БД (эквивалент load_vacancy_description)
@@ -115,8 +131,7 @@ class Logic:
                 return {}
             
             logging.debug(f"Загружаем файл: {full_path}")
-            loader = VacancyLoader(full_path)  # Передаем полный путь
-            job_descriptions = loader.load_vacancy_descriptions_field()
+            job_descriptions = self.load_vacancy_descriptions_field(full_path)  # Используем новый метод
             logging.debug(f"Загружено описаний: {len(job_descriptions)}")
             if not job_descriptions:
                 gui.show_error(f"Файл {full_path} не содержит описаний вакансий!")
