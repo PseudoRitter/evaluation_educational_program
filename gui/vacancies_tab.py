@@ -1,8 +1,11 @@
 import tkinter as tk
+import os
 from tkinter import filedialog
 from tkinter import ttk
 import logging
 from moduls.database import Database
+from moduls.labor_market_data import LaborMarketData  # Новый импорт
+from datetime import datetime
 
 def create_vacancies_tab(frame, app):
     container_frame = tk.Frame(frame)
@@ -41,7 +44,49 @@ def create_vacancies_tab(frame, app):
     app.selected_vacancy_label = tk.Label(select_frame, text="Выбрана вакансия: Нет")
     app.selected_vacancy_label.pack(side=tk.LEFT, padx=5)
 
+    # Создаём новый фрейм для поиска вакансий
+    search_vacancies_frame = tk.Frame(frame)
+    search_vacancies_frame.pack(pady=5)
+
+    # Добавляем текст, поле ввода и кнопку поиска в новый фрейм
+    tk.Label(search_vacancies_frame, text="Поисковый запрос вакансии:").pack(side=tk.LEFT, padx=5)
+    app.search_query_entry = tk.Entry(search_vacancies_frame)
+    app.search_query_entry.pack(side=tk.LEFT, padx=5)
+    tk.Button(search_vacancies_frame, text="Поиск вакансий", command=lambda: search_vacancies(app)).pack(side=tk.LEFT, padx=5)
     load_vacancies_table(app)
+
+def search_vacancies(app):
+    """Функция для поиска вакансий через LaborMarketData и добавления в таблицу после полного сбора."""
+    query = app.search_query_entry.get().strip()
+    if not query:
+        app.show_error("Введите поисковый запрос!")
+        return
+
+    ACCESS_TOKEN = "APPLRDK45780T0N5LTCCGEC9DU19NPGSORRJP5535R95VETEF4203PHSQI97V49C"
+    hh_data = LaborMarketData(query=query, access_token=ACCESS_TOKEN)
+    try:
+        hh_data.collect_all_vacancies()
+        current_date_time = datetime.now().strftime("%Y-%m-%d %H-%M")  # Формат YYYY-MM-DD HH-MI
+        filename = f"vacancies_hh/{query} {current_date_time}.json"
+        hh_data.save_to_json(filename)  # Сначала собираем и сохраняем все вакансии
+        
+        # После сбора всех вакансий добавляем запись в БД
+        vacancy_name = query
+        vacancy_quantity = len(hh_data.vacancies)
+        vacancy_date = current_date_time
+        vacancy_file = f"{query} {current_date_time}.json"
+
+        vacancy_id = app.logic.db.save_vacancy(vacancy_name, vacancy_quantity, vacancy_date, vacancy_file)
+        if vacancy_id:
+            app.show_info(f"Вакансии сохранены в {filename} и добавлены в БД (ID: {vacancy_id})")
+        else:
+            app.show_error("Не удалось сохранить вакансию в БД!")
+        
+        # Обновляем таблицу после добавления в БД
+        load_vacancies_table(app)
+    except Exception as e:
+        app.show_error(f"Ошибка при сборе вакансий: {e}")
+        logging.error(f"Ошибка при сборе вакансий для запроса '{query}': {e}")
 
 def on_vacancy_select(app):
     selected_item = app.vacancies_table.selection()
@@ -90,8 +135,8 @@ def edit_vacancy_window(app, selected_item, action):
     tk.Label(window, text="Файл вакансий:").pack(pady=5)
     file_entry = tk.Entry(window)
     file_entry.pack(pady=5)
-    tk.Button(window, text="Выбрать файл", command=lambda: file_entry.insert(tk.END, filedialog.askopenfilename())).pack(pady=5)
-
+    tk.Button(window, text="Выбрать файл", command=lambda: file_entry.insert(tk.END, os.path.basename(filedialog.askopenfilename()))).pack(pady=5)
+    
     if action == "edit":
         values = app.vacancies_table.item(selected_item[0])['values']
         name_entry.insert(0, values[1])

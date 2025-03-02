@@ -104,31 +104,31 @@ class Database:
             logging.error(f"Ошибка при получении деталей вакансии: {e}")
             return None
 
-    def load_vacancy_from_file(self, file_path):
-        """Загрузка данных вакансии из JSON-файла по указанному пути."""
-        try:
-            full_path = os.path.join(self.data_dir, str(file_path))
-            logging.debug(f"Попытка загрузки файла: {full_path}")
-            if not os.path.exists(full_path):
-                logging.error(f"Файл вакансии не найден: {full_path}")
-                raise FileNotFoundError(f"Файл вакансии не найден: {full_path}")
-            with open(full_path, 'r', encoding='utf-8') as f:
-                vacancy_data = json.load(f)
-            if isinstance(vacancy_data, list):
-                for vacancy in vacancy_data:
-                    if 'full_description' in vacancy:
-                        logging.debug(f"Найдено 'full_description': {vacancy['full_description'][:100]}...")
-                        return vacancy['full_description']
-                logging.warning(f"Поле 'full_description' не найдено в списке вакансий: {full_path}")
-                return ''
-            elif isinstance(vacancy_data, dict) and 'full_description' in vacancy_data:
-                logging.debug(f"Найдено 'full_description': {vacancy_data['full_description'][:100]}...")
-                return vacancy_data['full_description']
-            logging.warning(f"Поле 'full_description' не найдено в файле: {full_path}")
-            return ''
-        except (json.JSONDecodeError, Exception) as e:
-            logging.error(f"Ошибка при загрузке JSON-файла вакансии: {e}")
-            raise  # Передаём ошибку выше для более точной обработки
+    # def load_vacancy_from_file(self, file_path):
+    #     """Загрузка данных вакансии из JSON-файла по указанному пути."""
+    #     try:
+    #         full_path = os.path.join(self.data_dir, str(file_path))
+    #         logging.debug(f"Попытка загрузки файла: {full_path}")
+    #         if not os.path.exists(full_path):
+    #             logging.error(f"Файл вакансии не найден: {full_path}")
+    #             raise FileNotFoundError(f"Файл вакансии не найден: {full_path}")
+    #         with open(full_path, 'r', encoding='utf-8') as f:
+    #             vacancy_data = json.load(f)
+    #         if isinstance(vacancy_data, list):
+    #             for vacancy in vacancy_data:
+    #                 if 'full_description' in vacancy:
+    #                     logging.debug(f"Найдено 'full_description': {vacancy['full_description'][:100]}...")
+    #                     return vacancy['full_description']
+    #             logging.warning(f"Поле 'full_description' не найдено в списке вакансий: {full_path}")
+    #             return ''
+    #         elif isinstance(vacancy_data, dict) and 'full_description' in vacancy_data:
+    #             logging.debug(f"Найдено 'full_description': {vacancy_data['full_description'][:100]}...")
+    #             return vacancy_data['full_description']
+    #         logging.warning(f"Поле 'full_description' не найдено в файле: {full_path}")
+    #         return ''
+    #     except (json.JSONDecodeError, Exception) as e:
+    #         logging.error(f"Ошибка при загрузке JSON-файла вакансии: {e}")
+    #         raise  # Передаём ошибку выше для более точной обработки
 
     def save_educational_program(self, name, code, university_id, year, type_program_id, competences):
         """Сохранение новой образовательной программы в БД."""

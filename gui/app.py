@@ -5,7 +5,7 @@ from .vacancies_tab import create_vacancies_tab
 from .debug_tab import create_debug_tab
 from .assessment_tab import create_assessment_tab
 from .add_program_window import create_add_program_window
-from .rating_history_tab import create_rating_history_tab  # Новый импорт
+from .assessment_history_tab import create_rating_history_tab  # Новый импорт
 from concurrent.futures import ThreadPoolExecutor
 import logging
 import re
@@ -97,13 +97,6 @@ class App:
     def on_program_select(self, event):
         """Обработка выбора программы из выпадающего списка (теперь не используется, но оставляем для совместимости)."""
         pass  # Этот метод больше не нужен, но оставлен для совместимости с текущей логикой
-
-    # def on_vacancy_select(self, event):
-    #     """Обработка выбора вакансии из выпадающего списка."""
-    #     selected = self.vacancy_var.get()
-    #     if selected:
-    #         vacancy_id = int(selected.split("ID: ")[1].split(")")[0])  # Извлекаем ID из строки
-    #         logging.info(f"Выбрана вакансия с ID: {vacancy_id}")
 
     def start_analysis(self):
         try:

@@ -19,7 +19,7 @@ class LaborMarketData:
         while page < max_pages:
             params = {
                 'text': self.query,
-                'area': 113,
+                'area': 90, #113 - вся Россия
                 'per_page': 100,
                 'page': page,
                 'experience': experience
@@ -130,6 +130,6 @@ if __name__ == "__main__":
     hh_data = LaborMarketData(query="системный аналитик", access_token=ACCESS_TOKEN)
     try:
         hh_data.collect_all_vacancies()
-        hh_data.save_to_json("vacancies/системный аналитик.json")
+        hh_data.save_to_json("vacancies_hh/системный аналитик.json")
     except Exception as e:
         print(f"Process interrupted due to an error: {e}. Temporary data may be saved in temp_vacancies.json.")
