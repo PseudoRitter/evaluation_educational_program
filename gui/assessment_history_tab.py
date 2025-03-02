@@ -7,23 +7,23 @@ def create_rating_history_tab(frame, app):
     pass
     # Главный фрейм
     main_frame = tk.Frame(frame)
-    main_frame.pack(fill="both", expand=True, pady=5)
+    main_frame.pack(fill="both", expand=False, pady=5)
 
     # 1. Фрейм для таблицы образовательной программы и оцениваемой вакансии
     program_vacancy_frame = tk.LabelFrame(main_frame, text="Образовательная программа и оцениваемая вакансия")
-    program_vacancy_frame.pack(fill="both", expand=True, padx=5, pady=5)
+    program_vacancy_frame.pack(fill="both", expand=False, padx=5, pady=5)
 
     app.program_vacancy_history_table = ttk.Treeview(program_vacancy_frame, columns=("educational_program", "vacancy"), show="headings", height=6)
     app.program_vacancy_history_table.heading("educational_program", text="Образовательная программа")
     app.program_vacancy_history_table.heading("vacancy", text="Вакансия")
     app.program_vacancy_history_table.column("educational_program", width=400)
     app.program_vacancy_history_table.column("vacancy", width=300)
-    app.program_vacancy_history_table.pack(fill="both", expand=True)
+    app.program_vacancy_history_table.pack(fill="both", expand=False)
     app.program_vacancy_history_table.bind("<<TreeviewSelect>>", lambda event: update_history_competence_history_table(app))
 
     # 2. Фрейм для таблицы оценки компетенций образовательной программы
     competence_frame = tk.LabelFrame(main_frame, text="Оценка компетенций образовательной программы")
-    competence_frame.pack(fill="both", expand=True, padx=5, pady=5)
+    competence_frame.pack(fill="both", expand=False, padx=2, pady=5)
 
     app.competence_history_table = ttk.Treeview(competence_frame, columns=("competence", "type_competence", "score"), show="headings", height=6)
     app.competence_history_table.heading("competence", text="Компетенция")
@@ -32,7 +32,7 @@ def create_rating_history_tab(frame, app):
     app.competence_history_table.column("competence", width=400)
     app.competence_history_table.column("type_competence", width=300)
     app.competence_history_table.column("score", width=150)
-    app.competence_history_table.pack(fill="both", expand=True)
+    app.competence_history_table.pack(fill="both", expand=False)
 
     # Загрузка данных в таблицу программ и вакансий
     load_program_vacancy_history_table(app)

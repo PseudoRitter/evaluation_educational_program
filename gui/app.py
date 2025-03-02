@@ -36,9 +36,6 @@ class App:
         self.notebook.add(self.education_tab, text="ОП")
         from .education_tab import create_education_tab, on_table_select, load_education_table, preview_competences
         create_education_tab(self.education_tab, self)
-        # Привязываем кнопку "Выбрать" к методу on_table_select из education_tab
-        self.select_button = tk.Button(self.education_tab, text="Выбрать", command=lambda: on_table_select(self))
-        self.select_button.pack(pady=5)
         # Привязываем событие переключения вкладок
         self.notebook.bind("<<NotebookTabChanged>>", lambda event: load_education_table(self) if self.notebook.tab(self.notebook.select())['text'] == "ОП" else None)
         # Обработчик события для обновления таблицы компетенций

@@ -6,18 +6,15 @@ from .add_program_window import create_add_program_window, update_competence_tab
 def create_education_tab(frame, app):
     """Создание вкладки для образовательных программ."""
     # Фрейм для заголовка и таблицы образовательных программ
-    education_main_frame = tk.Frame(frame)
-    education_main_frame.pack(pady=5, fill="x", expand=True)
-
-    # Заголовок для таблицы
-    tk.Label(education_main_frame, text="Выберите образовательную программу:").pack(pady=5)
+    education_program_frame = tk.Frame(frame)
+    education_program_frame.pack(pady=4, fill="x", expand=False)
 
     # Фрейм для таблицы образовательных программ
-    education_table_frame = ttk.LabelFrame(education_main_frame, text="")
-    education_table_frame.pack(pady=5, padx=5, fill="both", expand=True)
+    education_table_frame = ttk.LabelFrame(education_program_frame, text="Выбор образовтельной программы")
+    education_table_frame.pack(pady=4, padx=4, fill="both", expand=False)
 
     # Таблица образовательных программ
-    app.education_table = ttk.Treeview( education_table_frame, columns=("name", "code", "year", "university_short", "type"), show="headings", height=8 )
+    app.education_table = ttk.Treeview(education_table_frame, columns=("name", "code", "year", "university_short", "type"), show="headings", height=8 )
     app.education_table.heading("name", text="Наименование ОП")
     app.education_table.heading("code", text="Код ОП")
     app.education_table.heading("year", text="Год ОП")
@@ -28,32 +25,31 @@ def create_education_tab(frame, app):
     app.education_table.column("year", width=80)
     app.education_table.column("university_short", width=150)
     app.education_table.column("type", width=150)
-    app.education_table.pack(pady=5, fill="x", expand=False)
+    app.education_table.pack(pady=4, fill="x", expand=False)
 
     # Кнопка "Выбрать"
     app.select_button = tk.Button(frame, text="Выбрать", command=lambda: on_table_select(app))
-    app.select_button.pack(pady=5)
+    app.select_button.pack(pady=4)
 
     # Надпись для отображения выбранной программы
     app.selected_program_label = tk.Label(frame, text="Выбрана программа: Нет")
-    app.selected_program_label.pack(pady=5)
+    app.selected_program_label.pack(pady=4)
 
     # Фрейм для таблицы компетенций
     app.competence_frame = ttk.LabelFrame(frame, text="Компетенции программы")
-    app.competence_frame.pack(pady=5, padx=5, fill="both", expand=True)
+    app.competence_frame.pack(pady=4, padx=4, fill="both", expand=False)
 
     # Таблица компетенций
-    app.competence_table = ttk.Treeview(
-        app.competence_frame, 
-        columns=("competence", "competence_type"), 
-        show="headings", 
-        height=10
-    )
+    app.competence_table = ttk.Treeview(app.competence_frame, columns=("competence", "competence_type"), show="headings", height=12)
     app.competence_table.heading("competence", text="Компетенция")
     app.competence_table.heading("competence_type", text="Вид компетенции")
     app.competence_table.column("competence", width=400)
     app.competence_table.column("competence_type", width=300)
-    app.competence_table.pack(pady=5, fill="both", expand=True)
+    app.competence_table.pack(pady=4, fill="both", expand=False)
+
+    # Кнопка "Добавить образовательную программу"
+    app.add_program_button = tk.Button(frame, text="Добавить образовательную программу", command=lambda: create_add_program_window(app.root, app))
+    app.add_program_button.pack(pady=10)
 
     # Стиль для подсветки выбранной строки
     style = ttk.Style()
@@ -66,9 +62,7 @@ def create_education_tab(frame, app):
     # Привязка события выбора строки
     app.education_table.bind("<<TreeviewSelect>>", lambda event: update_competence_table(app, _get_program_id_from_table(app, app.education_table.item(app.education_table.selection()[0])['values'] if app.education_table.selection() else None)))
 
-    # Кнопка "Добавить образовательную программу"
-    app.add_program_button = tk.Button(frame, text="Добавить образовательную программу", command=lambda: create_add_program_window(app.root, app))
-    app.add_program_button.pack(pady=10)
+    
 
 def load_education_table(app):
     """Загрузка данных образовательных программ в таблицу из БД."""
@@ -100,13 +94,13 @@ def preview_competences(app):
     if not hasattr(app, 'competence_table') or not app.competence_table.winfo_exists():
         logging.warning("Таблица компетенций недоступна. Инициализация новой.")
         app.competence_frame = ttk.LabelFrame(app.education_tab, text="Компетенции программы")
-        app.competence_frame.pack(pady=5, padx=5, fill="both", expand=True)
-        app.competence_table = ttk.Treeview(app.competence_frame, columns=("competence", "competence_type"), show="headings", height=10)
+        app.competence_frame.pack(pady=4, padx=4, fill="both", expand=False)
+        app.competence_table = ttk.Treeview(app.competence_frame, columns=("competence", "competence_type"), show="headings", height=14)
         app.competence_table.heading("competence", text="Компетенция")
         app.competence_table.heading("competence_type", text="Вид компетенции")
         app.competence_table.column("competence", width=400)
         app.competence_table.column("competence_type", width=300)
-        app.competence_table.pack(pady=5, fill="both", expand=True)
+        app.competence_table.pack(pady=4, fill="both", expand=False)
 
     app.competence_table.delete(*app.competence_table.get_children())
     competences = app.logic.db.fetch_program_details(program_id)

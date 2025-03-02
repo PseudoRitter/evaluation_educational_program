@@ -7,51 +7,47 @@ import logging
 def create_assessment_tab(frame, app):
     # Главный фрейм
     main_frame = tk.Frame(frame)
-    main_frame.pack(fill="both", expand=True)
-
-    # 1. Фрейм для начала анализа
-    start_analysis_frame = tk.Frame(main_frame)
-    start_analysis_frame.pack(pady=2, fill="x")
-    app.run_button = tk.Button(start_analysis_frame, text="Запустить анализ", command=app.start_analysis)
-    app.run_button.pack()
+    main_frame.pack(fill="both", expand=False)
 
     # Контейнер для таблиц результатов и общей информации
     results_container = tk.Frame(main_frame)
-    results_container.pack(pady=2, fill="both", expand=True)
+    results_container.pack(pady=4, fill="both", expand=False)
 
-    # 2. Фрейм для таблицы результатов оценки
-    skill_results_frame = tk.Frame(results_container)
-    skill_results_frame.pack(fill="both", expand=True)
-    app.skill_results_label = tk.Label(skill_results_frame, text="Результаты оценки компетенций:")
-    app.skill_results_label.pack(pady=2)
-    app.skill_results_table = ttk.Treeview(skill_results_frame, columns=("competence", "type_competence", "score"), show="headings", height=10)
+    # Фрейм для результатов анализа
+    skill_results_frame = tk.LabelFrame(results_container, text="Результаты оценки компетенций:")
+    skill_results_frame.pack(fill="both", expand=False)
+    
+    # Таблица для фрейма 
+    app.skill_results_table = ttk.Treeview(skill_results_frame, columns=("competence", "type_competence", "score"), show="headings", height=13)
     app.skill_results_table.heading("competence", text="Компетенция")
     app.skill_results_table.heading("type_competence", text="Тип компетенции")
     app.skill_results_table.heading("score", text="Оценка")
     app.skill_results_table.column("competence", width=400)
     app.skill_results_table.column("type_competence", width=300)
     app.skill_results_table.column("score", width=150)
-    app.skill_results_table.pack(pady=2, fill="x")  # Уменьшен pady для минимального расстояния
+    app.skill_results_table.pack(pady=4, fill="x")  # Уменьшен pady для минимального расстояния
     app.skill_results_table = app.skill_results_table  # Сохраняем как атрибут
 
-    # 3. Фрейм для общей информации об анализе
-    group_scores_frame = tk.Frame(results_container)
-    group_scores_frame.pack(fill="both", expand=True)
-    app.group_scores_label = tk.Label(group_scores_frame, text="Оценки групп компетенций и программы:")
-    app.group_scores_label.pack(pady=2)
-    app.group_scores_area = scrolledtext.ScrolledText(group_scores_frame, width=120, height=6)
-    app.group_scores_area.pack(pady=2)
+    start_analysis_frame = tk.Frame(main_frame)
+    start_analysis_frame.pack(pady=4, fill="x")
+    app.run_button = tk.Button(start_analysis_frame, text="Запустить анализ", command=app.start_analysis)
+    app.run_button.pack()
+
+    group_scores_frame = tk.LabelFrame(results_container, text="Оценки групп компетенций и программы:")
+    group_scores_frame.pack(pady=4, fill="both", expand=False)
+    app.group_scores_area = scrolledtext.ScrolledText(group_scores_frame, width=120, height=8)
+    app.group_scores_area.pack(pady=4)
     app.group_scores_area = app.group_scores_area  # Сохраняем как атрибут
 
-    # 4. Фрейм для сохранения строк
+    # Фрейм для сохранения строк
     export_frame = tk.Frame(main_frame)
-    export_frame.pack(pady=2, fill="both", expand=True) 
+    export_frame.pack(pady=4, fill="both", expand=False) 
     app.export_button = tk.Button(export_frame, text="Экспорт в Excel", command=app.logic.export_results_to_excel)
     app.export_button.pack()
 
-    # 5. Фрейм для кнопки сохранения результатов
+    # Фрейм для кнопки сохранения результатов
     save_results_frame = tk.Frame(main_frame)
-    save_results_frame.pack(pady=2, fill="x")
+    save_results_frame.pack(pady=4, fill="x")
     app.save_results_button = tk.Button(save_results_frame, text="Сохранить результаты оценивания", command=lambda: save_assessment_results(app))
     app.save_results_button.pack()
 
