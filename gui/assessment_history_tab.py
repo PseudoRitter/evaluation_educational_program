@@ -3,6 +3,7 @@ import logging
 import numpy as np
 from tkinter import ttk, scrolledtext
 from datetime import datetime
+from moduls.export_to_excel import ExcelExporter
 
 def create_rating_history_tab(frame, app):
     main_frame = tk.Frame(frame)
@@ -11,7 +12,6 @@ def create_rating_history_tab(frame, app):
     program_vacancy_frame = tk.LabelFrame(main_frame, text="Образовательная программа и оцениваемая вакансия")
     program_vacancy_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-    # Добавляем новый столбец "assessment_date"
     app.program_vacancy_history_table = ttk.Treeview(program_vacancy_frame, columns=("educational_program", "vacancy", "assessment_date"), show="headings", height=6)
     app.program_vacancy_history_table.heading("educational_program", text="Образовательная программа")
     app.program_vacancy_history_table.heading("vacancy", text="Вакансия")
@@ -43,10 +43,71 @@ def create_rating_history_tab(frame, app):
 
     export_history_frame = tk.Frame(main_frame)
     export_history_frame.pack(pady=4, fill="both", expand=False)
-    app.export_history_button = tk.Button(export_history_frame, text="Экспорт в Excel", command=app.logic.export_results_to_excel)
+    app.export_history_button = tk.Button(export_history_frame, text="Экспорт в Excel", command=lambda: export_history_to_excel(app))
     app.export_history_button.pack()
 
     load_program_vacancy_history_table(app)
+
+def export_history_to_excel(app):
+    """Экспорт данных из таблиц истории в Excel."""
+    from tkinter import messagebox
+    
+    selected_item = app.program_vacancy_history_table.selection()
+    if not selected_item:
+        messagebox.showerror("Ошибка", "Выберите запись для экспорта!")
+        return
+
+    values = app.program_vacancy_history_table.item(selected_item[0])['values']
+    educational_program_name, vacancy_name, assessment_date = values
+
+    # Собираем данные для экспорта
+    results = {
+        "similarity_results": {},
+        "group_scores": {},
+        "overall_score": 0.0
+    }
+
+    try:
+        # Компетенции
+        conn = app.logic.db.get_connection()
+        with conn.cursor() as cursor:
+            query = """
+                SELECT 
+                    c.competence_name,
+                    tc.type_competence_full_name,
+                    a.value
+                FROM public.assessment a
+                JOIN educational_program ep ON a.educational_program_id = ep.educational_program_id
+                JOIN vacancy v ON a.vacancy_id = v.vacancy_id
+                JOIN competence c ON a.competence_id = c.competence_id
+                JOIN type_competence tc ON a.type_competence_id = tc.type_competence_id
+                WHERE ep.educational_program_name = %s AND v.vacancy_name = %s AND a.assessment_date = %s
+                ORDER BY c.competence_name;
+            """
+            cursor.execute(query, (educational_program_name, vacancy_name, assessment_date))
+            competences = cursor.fetchall()
+            for competence_name, type_competence, score in competences:
+                results["similarity_results"][competence_name] = (float(score), type_competence)
+
+            # Групповые оценки и общая оценка
+            group_scores = {}
+            for _, type_competence, score in competences:
+                if type_competence not in group_scores:
+                    group_scores[type_competence] = []
+                group_scores[type_competence].append(float(score))
+            
+            results["group_scores"] = {ctype: np.mean(scores) for ctype, scores in group_scores.items()}
+            results["overall_score"] = np.mean([score for _, scores in group_scores.items() for score in scores])
+
+        app.logic.db.release_connection(conn)
+
+        # Экспорт
+        exporter = ExcelExporter(results, program_name=educational_program_name, vacancy_name=vacancy_name)
+        exporter.export_to_excel()
+
+    except Exception as e:
+        messagebox.showerror("Ошибка", f"Ошибка экспорта: {e}")
+        logging.error(f"Ошибка экспорта истории: {e}", exc_info=True)
 
 def load_program_vacancy_history_table(app):
     """Загрузка уникальных пар программ, вакансий и даты анализа из таблицы assessment."""

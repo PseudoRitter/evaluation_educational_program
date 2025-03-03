@@ -216,12 +216,18 @@ class Logic:
             logging.error(f"Ошибка при загрузке описаний из {full_path}: {e}")
             return []
 
-    def export_results_to_excel(self):
+    def export_results_to_excel(self, app):
         from tkinter import messagebox
         if not self.results:
             messagebox.showerror("Ошибка", "Нет данных для экспорта!")
             return
-        exporter = ExcelExporter(self.results)
+        
+        # Извлекаем текст из меток
+        selected_program = app.selected_program_label.cget("text").replace("Выбрана программа: ", "")
+        selected_vacancy = app.selected_vacancy_label.cget("text").replace("Выбрана вакансия: ", "")
+        
+        # Передаем в ExcelExporter с явным указанием параметров
+        exporter = ExcelExporter(self.results, program_name=selected_program, vacancy_name=selected_vacancy)
         exporter.export_to_excel()
 
     @staticmethod

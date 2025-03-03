@@ -12,8 +12,8 @@ logging.basicConfig(
 if __name__ == "__main__":
     root = tk.Tk()  # Создание главного окна
     logic = Logic()  # Создание объекта логики
-    app = App(root, logic)  # Передаем логику в интерфейс
-    app.logic = logic      # Устанавливаем logic в app после создания
+    app = App(root, logic)  # Передаем логику в интерфейс и инициализируем приложение
+    
     try:
         root.mainloop()  # Запуск основного цикла обработки событий
     except Exception as e:

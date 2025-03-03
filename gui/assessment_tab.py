@@ -34,7 +34,7 @@ def create_assessment_tab(frame, app):
 
     export_frame = tk.Frame(main_frame)
     export_frame.pack(pady=4, fill="both", expand=False)
-    app.export_button = tk.Button(export_frame, text="Экспорт в Excel", command=app.logic.export_results_to_excel)
+    app.export_button = tk.Button(export_frame, text="Экспорт в Excel", command=lambda: app.logic.export_results_to_excel(app))
     app.export_button.pack()
 
     save_results_frame = tk.Frame(main_frame)

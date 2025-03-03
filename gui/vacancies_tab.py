@@ -86,7 +86,7 @@ def on_vacancy_select(app):
 
     values = app.vacancies_table.item(selected_item[0])['values']
     app.selected_vacancy_id = values[0]
-    app.selected_vacancy_label.config(text=f"Выбрана вакансия: {values[1]} (ID: {values[0]})")
+    app.selected_vacancy_label.config(text=f"Выбрана вакансия: {values[1]}")
     logging.info(f"Выбрана вакансия: {values[1]}, ID: {values[0]}")
 
 def load_vacancies_table(app):
