@@ -3,7 +3,6 @@ from tkinter import ttk
 import logging
 
 def create_add_program_window(root, app):
-    """Создание окна для добавления образовательной программы с функционалом работы с ВУЗами, ОП и компетенциями."""
     add_window = tk.Toplevel(root)
     add_window.title("Добавление образовательной программы")
     add_window.geometry("1100x800")
@@ -11,23 +10,37 @@ def create_add_program_window(root, app):
     main_frame = tk.Frame(add_window)
     main_frame.pack(pady=10, padx=10, fill="both", expand=True)
 
-    # Создание блоков для ВУЗов, программ и компетенций
     create_university_section(main_frame, app, add_window)
     create_program_section(main_frame, app, add_window)
     create_competence_section(main_frame, app, add_window)
 
-    # Загрузка начальных данных
-    load_university_table(app)
-    load_program_table(app)
-    load_competence_table(app, None)
-
-    # Стили для таблиц
+    load_tables(app)
     style = ttk.Style()
     style.configure("Treeview", rowheight=25)
     style.map("Treeview", background=[("selected", "blue")], foreground=[("selected", "white")])
 
+def load_tables(app):
+    if not hasattr(app, 'universities'):
+        app.universities = app.logic.db.fetch_universities()
+    load_table(app.university_table, app.universities)
+
+    if not hasattr(app, 'programs'):
+        app.programs = app.logic.db.fetch_educational_programs_with_details()
+    load_table(app.program_table, [(p[0], p[1], p[2] or "", p[3], p[4]) for p in app.programs])
+
+    load_table(app.competence_table_add, 
+               app.logic.db.fetch_competences_for_program(app.selected_program_id) 
+               if hasattr(app, 'selected_program_id') else [])
+
+def load_table(table, data):
+    try:
+        table.delete(*table.get_children())
+        for row in data:
+            table.insert("", tk.END, values=row)
+    except Exception as e:
+        logging.error(f"Ошибка загрузки таблицы: {e}")
+
 def create_university_section(parent_frame, app, window):
-    """Создание секции для управления ВУЗами."""
     frame = tk.Frame(parent_frame)
     frame.pack(pady=5, fill="x", expand=True)
 
@@ -54,7 +67,6 @@ def create_university_section(parent_frame, app, window):
     tk.Button(button_frame, text="Удалить", command=lambda: delete_entity(app, window, "university")).pack(pady=5)
 
 def create_program_section(parent_frame, app, window):
-    """Создание секции для управления образовательными программами."""
     frame = tk.Frame(parent_frame)
     frame.pack(pady=5, fill="x", expand=True)
 
@@ -86,11 +98,10 @@ def create_program_section(parent_frame, app, window):
     tk.Button(button_frame, text="Удалить", command=lambda: delete_entity(app, window, "program")).pack(pady=5)
 
     tk.Button(frame, text="Выбрать программу", command=lambda: confirm_program_selection(app)).pack(pady=5)
-    app.add_window_selected_program_label = tk.Label(frame, text="Выбрана программа: Нет")  # Переименована
+    app.add_window_selected_program_label = tk.Label(frame, text="Выбрана программа: Нет")
     app.add_window_selected_program_label.pack(pady=5)
 
 def create_competence_section(parent_frame, app, window):
-    """Создание секции для управления компетенциями."""
     frame = tk.Frame(parent_frame)
     frame.pack(pady=5, fill="x", expand=True)
 
@@ -115,43 +126,12 @@ def create_competence_section(parent_frame, app, window):
     tk.Button(button_frame, text="Удалить", command=lambda: delete_entity(app, window, "competence")).pack(pady=5)
 
 def on_program_table_select(app):
-    """Обработка выбора строки в таблице образовательных программ."""
     selected_item = app.program_table.selection()
     if selected_item:
         values = app.program_table.item(selected_item[0])['values']
-        app.temp_selected_program = (values[0], values[1])  # name, code
-
-def load_university_table(app):
-    """Загрузка данных ВУЗов в таблицу."""
-    try:
-        app.university_table.delete(*app.university_table.get_children())
-        for university in app.logic.db.fetch_universities():
-            app.university_table.insert("", tk.END, values=university)
-    except Exception as e:
-        logging.error(f"Ошибка при загрузке ВУЗов: {e}")
-
-def load_program_table(app):
-    """Загрузка данных образовательных программ в таблицу."""
-    try:
-        app.program_table.delete(*app.program_table.get_children())
-        for program in app.logic.db.fetch_educational_programs_with_details():
-            year = program[2] if program[2] else ""
-            app.program_table.insert("", tk.END, values=(program[0], program[1], year, program[3], program[4]))
-    except Exception as e:
-        logging.error(f"Ошибка при загрузке программ: {e}")
-
-def load_competence_table(app, program_id):
-    """Загрузка данных компетенций в таблицу."""
-    try:
-        app.competence_table_add.delete(*app.competence_table_add.get_children())
-        if program_id:
-            for competence in app.logic.db.fetch_competences_for_program(program_id):
-                app.competence_table_add.insert("", tk.END, values=competence)
-    except Exception as e:
-        logging.error(f"Ошибка при загрузке компетенций: {e}")
+        app.temp_selected_program = (values[0], values[1])
 
 def edit_entity_window(app, parent_window, entity_type, action):
-    """Универсальное окно для добавления или редактирования сущности."""
     entity_configs = {
         "university": {
             "title": "ВУЗ" if action == "add" else "Редактирование ВУЗа",
@@ -165,7 +145,7 @@ def edit_entity_window(app, parent_window, entity_type, action):
                 ("Наименование ОП:", tk.Entry),
                 ("Код ОП:", tk.Entry),
                 ("Год ОП:", tk.Entry),
-                ("Краткое наименование ВУЗа:", lambda w: ttk.Combobox(w, values=[u[1] for u in app.logic.db.fetch_universities()], state="readonly")),
+                ("Краткое наименование ВУЗа:", lambda w: ttk.Combobox(w, values=[u[1] for u in app.universities], state="readonly")),
                 ("Вид программы:", lambda w: ttk.Combobox(w, values=[t[1] for t in app.logic.db.fetch_educational_program_types()], state="readonly"))
             ],
             "size": "500x400",
@@ -188,7 +168,7 @@ def edit_entity_window(app, parent_window, entity_type, action):
         logging.error(f"Выберите {entity_type} для редактирования!")
         return
     if entity_type == "competence" and config["requires_program"] and not hasattr(app, 'selected_program_id'):
-        logging.error("Сначала выберите образовательную программу!")
+        logging.error("Сначала выберите программу!")
         return
 
     window = tk.Toplevel(parent_window)
@@ -213,7 +193,6 @@ def edit_entity_window(app, parent_window, entity_type, action):
     tk.Button(window, text="Сохранить", command=lambda: save_entity(app, window, parent_window, entity_type, action, entries, old_values if action == "edit" else None)).pack(pady=10)
 
 def save_entity(app, window, parent_window, entity_type, action, entries, old_values=None):
-    """Сохранение сущности в БД."""
     values = [e.get().strip() if isinstance(e, tk.Entry) else e.get() for e in entries]
     if not all(values):
         logging.error("Все поля должны быть заполнены!")
@@ -227,25 +206,28 @@ def save_entity(app, window, parent_window, entity_type, action, entries, old_va
         elif entity_type == "competence":
             save_competence(app, values, old_values, action)
         window.destroy()
+        if entity_type == "program":
+            from .education_tab import sync_program_tables  # Локальный импорт
+            sync_program_tables(app)
+        else:
+            load_tables(app)
     except Exception as e:
         logging.error(f"Ошибка при сохранении {entity_type}: {e}")
 
 def save_university(app, values, old_values, action):
-    """Сохранение ВУЗа."""
     full_name, short_name, city = values
     if action == "add":
         university_id = app.logic.db.save_university(full_name, short_name, city)
         if university_id:
-            load_university_table(app)
+            app.universities = app.logic.db.fetch_universities()
             logging.info(f"ВУЗ '{full_name}' добавлен!")
     else:
         university_id = app.logic.db.fetch_university_id_by_details(*old_values)[0]
         if app.logic.db.update_university(university_id, full_name, short_name, city):
-            load_university_table(app)
+            app.universities = app.logic.db.fetch_universities()
             logging.info(f"ВУЗ обновлён: {full_name}")
 
 def save_program(app, values, old_values, action):
-    """Сохранение образовательной программы."""
     name, code, year, university_short, type_name = values
     university = app.logic.db.fetch_university_by_short_name(university_short)
     type_program = app.logic.db.fetch_educational_program_type_by_name(type_name)
@@ -257,24 +239,15 @@ def save_program(app, values, old_values, action):
     if action == "add":
         program_id = app.logic.db.save_educational_program(name, code, university_id, year, type_program_id, [])
         if program_id:
-            load_program_table(app)
-            from .education_tab import load_education_table
-            load_education_table(app)  # Обновляем таблицу в education_tab
+            app.programs = app.logic.db.fetch_educational_programs_with_details()
             logging.info(f"Программа '{name}' добавлена!")
     else:
-        program_id = app.logic.db.fetch_program_id_by_name_and_code(old_values[0], old_values[1])
-        if program_id is None:
-            logging.error(f"Не удалось найти программу для обновления: {old_values[0]}, код: {old_values[1]}")
-            return
-        program_id = program_id[0]
+        program_id = app.logic.db.fetch_program_id_by_name_and_code(old_values[0], old_values[1])[0]
         if app.logic.db.update_educational_program(program_id, name, code, university_id, year, type_program_id):
-            load_program_table(app)
-            from .education_tab import load_education_table
-            load_education_table(app)
+            app.programs = app.logic.db.fetch_educational_programs_with_details()
             logging.info(f"Программа '{name}' обновлена!")
 
 def save_competence(app, values, old_values, action):
-    """Сохранение компетенции."""
     competence_name, type_name = values
     type_id = next((t[0] for t in app.logic.db.fetch_competence_types() if t[1] == type_name), None)
     if not type_id:
@@ -286,16 +259,13 @@ def save_competence(app, values, old_values, action):
 
     if action == "add":
         if app.logic.db.save_competence_for_program(competence_id, type_id, app.selected_program_id):
-            load_competence_table(app, app.selected_program_id)
             logging.info(f"Компетенция '{competence_name}' добавлена!")
     else:
         old_competence = app.logic.db.fetch_competence_by_name(old_values[0])
         if app.logic.db.update_competence_for_program(old_competence[0], old_competence[2], app.selected_program_id, competence_id, type_id):
-            load_competence_table(app, app.selected_program_id)
             logging.info(f"Компетенция '{competence_name}' обновлена!")
 
 def delete_entity(app, parent_window, entity_type):
-    """Удаление сущности из БД."""
     table_map = {"university": app.university_table, "program": app.program_table, "competence": app.competence_table_add}
     table = table_map[entity_type]
     selected_item = table.selection()
@@ -308,14 +278,12 @@ def delete_entity(app, parent_window, entity_type):
         if entity_type == "university":
             university_id = app.logic.db.fetch_university_id_by_details(*values)[0]
             if app.logic.db.delete_university(university_id):
-                load_university_table(app)
+                app.universities = app.logic.db.fetch_universities()
                 logging.info(f"ВУЗ '{values[0]}' удалён!")
         elif entity_type == "program":
             program_id = app.logic.db.fetch_program_id_by_name_and_code(values[0], values[1])[0]
             if app.logic.db.delete_educational_program(program_id):
-                load_program_table(app)
-                from .education_tab import load_education_table
-                load_education_table(app)
+                app.programs = app.logic.db.fetch_educational_programs_with_details()
                 logging.info(f"Программа '{values[0]}' удалена!")
         elif entity_type == "competence":
             if not hasattr(app, 'selected_program_id'):
@@ -323,13 +291,17 @@ def delete_entity(app, parent_window, entity_type):
                 return
             competence = app.logic.db.fetch_competence_by_name(values[0])
             if app.logic.db.delete_competence_for_program(competence[0], competence[2], app.selected_program_id):
-                load_competence_table(app, app.selected_program_id)
                 logging.info(f"Компетенция '{values[0]}' удалена!")
+        
+        if entity_type == "program":
+            from .education_tab import sync_program_tables  # Локальный импорт
+            sync_program_tables(app)
+        else:
+            load_tables(app)
     except Exception as e:
         logging.error(f"Ошибка при удалении {entity_type}: {e}")
 
 def confirm_program_selection(app):
-    """Подтверждение выбора программы."""
     if not hasattr(app, 'temp_selected_program'):
         logging.error("Выберите программу в таблице!")
         return
@@ -339,40 +311,8 @@ def confirm_program_selection(app):
     if program_id:
         app.add_window_selected_program_label.config(text=f"Выбрана программа: {name}")
         app.selected_program_id = program_id[0]
-        load_competence_table(app, program_id[0])
+        load_tables(app)
         logging.info(f"Выбрана программа: {name}, ID: {program_id[0]}")
         delattr(app, 'temp_selected_program')
     else:
         logging.error(f"Не удалось найти ID для программы: {name}, код: {code}")
-
-def update_competence_table(app_instance, program_id, table_name="competence_table"):
-    """Обновление таблицы компетенций для выбранной программы.
-    Args:
-        app_instance: Экземпляр приложения (App или контекст).
-        program_id: ID образовательной программы.
-        table_name (str): Имя атрибута таблицы (по умолчанию 'competence_table', для 'add_program_window' можно 'competence_table_add').
-    """
-    # Проверяем доступность таблицы по указанному имени
-    table_attr = getattr(app_instance, table_name, None)
-    frame_attr = getattr(app_instance, f"{table_name}_frame", None)
-    
-    if not table_attr or not table_attr.winfo_exists():
-        logging.warning(f"Таблица {table_name} недоступна. Выполняется переинициализация.")
-        if frame_attr and frame_attr.winfo_exists():
-            frame_attr.destroy()
-        setattr(app_instance, f"{table_name}_frame", ttk.LabelFrame(app_instance.education_tab if hasattr(app_instance, 'education_tab') else app_instance, text="Компетенции программы"))
-        getattr(app_instance, f"{table_name}_frame").pack(pady=5, padx=5, fill="both", expand=True)
-        setattr(app_instance, table_name, ttk.Treeview(getattr(app_instance, f"{table_name}_frame"), columns=("competence", "competence_type"), show="headings", height=10))
-        table_attr = getattr(app_instance, table_name)
-        table_attr.heading("competence", text="Компетенция")
-        table_attr.heading("competence_type", text="Вид компетенции")
-        table_attr.column("competence", width=400)
-        table_attr.column("competence_type", width=300)
-        table_attr.pack(pady=5, fill="both", expand=True)
-    # Обновляем данные в таблице
-    table_attr.delete(*table_attr.get_children())
-    competences = app_instance.logic.db.fetch_program_details(program_id)
-    for competence in competences:
-        competence_name, competence_type = competence[5], competence[6]  # competence_name, type_competence_full_name
-        if competence_name:
-            table_attr.insert("", tk.END, values=(competence_name, competence_type or "Неизвестно"))

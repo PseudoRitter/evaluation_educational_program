@@ -1,25 +1,29 @@
 import psycopg2
+from psycopg2.pool import ThreadedConnectionPool
 import logging
-import json
-import os
 from psycopg2 import Error
+import os
+import json
 
 class Database:
     def __init__(self, db_params, data_dir="vacancies"):
         """Инициализация подключения к базе данных PostgreSQL."""
+        if not isinstance(db_params, dict):
+            raise ValueError("db_params должен быть словарем, а не множеством или другим типом")
         self.db_params = db_params
-        self.data_dir = data_dir  # Директория, где хранятся JSON-файлы
+        self.data_dir = data_dir
         self.connection = None
         self.cursor = None
+        self.pool = ThreadedConnectionPool(1, 10, **self.db_params)  # Исправлено использование ThreadedConnectionPool
         self.connect()
 
     def connect(self):
         """Установка соединения с базой данных."""
         try:
-            self.connection = psycopg2.connect(**self.db_params)
+            self.connection = self.pool.getconn()
             self.cursor = self.connection.cursor()
             logging.info("Успешно подключено к базе данных PostgreSQL")
-        except Error as e:
+        except Exception as e:
             logging.error(f"Ошибка подключения к базе данных: {e}")
             raise
 
@@ -29,575 +33,536 @@ class Database:
             if self.cursor:
                 self.cursor.close()
             if self.connection:
-                self.connection.close()
+                self.pool.putconn(self.connection)
             logging.info("Соединение с базой данных закрыто")
-        except Error as e:
+        except Exception as e:
             logging.error(f"Ошибка при закрытии соединения: {e}")
 
+    def get_connection(self):
+        """Получение соединения из пула."""
+        return self.pool.getconn()
+
+    def release_connection(self, conn):
+        """Возврат соединения в пул."""
+        if conn:
+            self.pool.putconn(conn)
+
     def fetch_educational_programs(self):
-        """Получение списка образовательных программ из БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT educational_program_id, educational_program_name, educational_program_code
-                FROM educational_program
-                ORDER BY educational_program_name;
-            """
-            self.cursor.execute(query)
-            return self.cursor.fetchall()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT educational_program_id, educational_program_name, educational_program_code
+                    FROM educational_program
+                    ORDER BY educational_program_name;
+                """)
+                return cursor.fetchall()
         except Error as e:
-            logging.error(f"Ошибка при получении образовательных программ: {e}")
+            logging.error(f"Ошибка при получении программ: {e}")
             return []
+        finally:
+            self.release_connection(conn)
 
     def fetch_vacancies(self):
-        """Получение списка вакансий из БД с путями к JSON-файлам."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT vacancy_id, vacancy_name, vacancy_num, vacancty_date, vacancy_file
-                FROM vacancy
-                ORDER BY vacancy_name;
-            """
-            self.cursor.execute(query)
-            return self.cursor.fetchall()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT vacancy_id, vacancy_name, vacancy_num, vacancty_date, vacancy_file
+                    FROM vacancy
+                    ORDER BY vacancy_name;
+                """)
+                return cursor.fetchall()
         except Error as e:
             logging.error(f"Ошибка при получении вакансий: {e}")
             return []
+        finally:
+            self.release_connection(conn)
 
     def fetch_program_details(self, program_id):
-        """Получение деталей образовательной программы, включая описание и навыки."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT 
-                    ep.educational_program_name, 
-                    ep.educational_program_code, 
-                    u.university_full_name, 
-                    ep.educational_program_year,
-                    cep.competence_id, 
-                    c.competence_name, 
-                    tc.type_competence_full_name
-                FROM educational_program ep
-                LEFT JOIN university u ON ep.university_id = u.university_id
-                LEFT JOIN competence_educational_program cep ON ep.educational_program_id = cep.educational_program_id
-                LEFT JOIN competence c ON cep.competence_id = c.competence_id AND cep.type_competence_id = c.type_competence_id
-                LEFT JOIN type_competence tc ON c.type_competence_id = tc.type_competence_id
-                WHERE ep.educational_program_id = %s;
-            """
-            self.cursor.execute(query, (program_id,))
-            return self.cursor.fetchall()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT 
+                        ep.educational_program_name, 
+                        ep.educational_program_code, 
+                        u.university_full_name, 
+                        ep.educational_program_year,
+                        cep.competence_id, 
+                        c.competence_name, 
+                        tc.type_competence_full_name
+                    FROM educational_program ep
+                    LEFT JOIN university u ON ep.university_id = u.university_id
+                    LEFT JOIN competence_educational_program cep ON ep.educational_program_id = cep.educational_program_id
+                    LEFT JOIN competence c ON cep.competence_id = c.competence_id AND cep.type_competence_id = c.type_competence_id
+                    LEFT JOIN type_competence tc ON c.type_competence_id = tc.type_competence_id
+                    WHERE ep.educational_program_id = %s;
+                """, (program_id,))
+                return cursor.fetchall()
         except Error as e:
             logging.error(f"Ошибка при получении деталей программы: {e}")
             return []
+        finally:
+            self.release_connection(conn)
 
     def fetch_vacancy_details(self, vacancy_id):
-        """Получение деталей вакансии, включая путь к JSON-файлу."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT vacancy_name, vacancy_num, vacancty_date, vacancy_file
-                FROM vacancy
-                WHERE vacancy_id = %s;
-            """
-            self.cursor.execute(query, (vacancy_id,))
-            result = self.cursor.fetchone()
-            if result:
-                return result  # Убедимся, что vacancy_file (result[3]) — строка
-            return None
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT vacancy_name, vacancy_num, vacancty_date, vacancy_file
+                    FROM vacancy
+                    WHERE vacancy_id = %s;
+                """, (vacancy_id,))
+                return cursor.fetchone()
         except Error as e:
             logging.error(f"Ошибка при получении деталей вакансии: {e}")
             return None
-
-    # def load_vacancy_from_file(self, file_path):
-    #     """Загрузка данных вакансии из JSON-файла по указанному пути."""
-    #     try:
-    #         full_path = os.path.join(self.data_dir, str(file_path))
-    #         logging.debug(f"Попытка загрузки файла: {full_path}")
-    #         if not os.path.exists(full_path):
-    #             logging.error(f"Файл вакансии не найден: {full_path}")
-    #             raise FileNotFoundError(f"Файл вакансии не найден: {full_path}")
-    #         with open(full_path, 'r', encoding='utf-8') as f:
-    #             vacancy_data = json.load(f)
-    #         if isinstance(vacancy_data, list):
-    #             for vacancy in vacancy_data:
-    #                 if 'full_description' in vacancy:
-    #                     logging.debug(f"Найдено 'full_description': {vacancy['full_description'][:100]}...")
-    #                     return vacancy['full_description']
-    #             logging.warning(f"Поле 'full_description' не найдено в списке вакансий: {full_path}")
-    #             return ''
-    #         elif isinstance(vacancy_data, dict) and 'full_description' in vacancy_data:
-    #             logging.debug(f"Найдено 'full_description': {vacancy_data['full_description'][:100]}...")
-    #             return vacancy_data['full_description']
-    #         logging.warning(f"Поле 'full_description' не найдено в файле: {full_path}")
-    #         return ''
-    #     except (json.JSONDecodeError, Exception) as e:
-    #         logging.error(f"Ошибка при загрузке JSON-файла вакансии: {e}")
-    #         raise  # Передаём ошибку выше для более точной обработки
+        finally:
+            self.release_connection(conn)
 
     def save_educational_program(self, name, code, university_id, year, type_program_id, competences):
-        """Сохранение новой образовательной программы в БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                INSERT INTO educational_program (educational_program_name, educational_program_code, 
-                                                university_id, educational_program_year, type_educational_program_id)
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING educational_program_id;
-            """
-            self.cursor.execute(query, (name, code, university_id, year, type_program_id))
-            program_id = self.cursor.fetchone()[0]
-            
-            # Сохранение компетенций
-            for competence_id, type_competence_id in competences:
-                query_competence = """
-                    INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
-                    VALUES (%s, %s, %s);
-                """
-                self.cursor.execute(query_competence, (competence_id, type_competence_id, program_id))
-            
-            self.connection.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO educational_program (educational_program_name, educational_program_code, 
+                                                    university_id, educational_program_year, type_educational_program_id)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING educational_program_id;
+                """, (name, code, university_id, year, type_program_id))
+                program_id = cursor.fetchone()[0]
+                for competence_id, type_competence_id in competences:
+                    cursor.execute("""
+                        INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
+                        VALUES (%s, %s, %s);
+                    """, (competence_id, type_competence_id, program_id))
+            conn.commit()
             return program_id
         except Error as e:
-            logging.error(f"Ошибка при сохранении образовательной программы: {e}")
-            self.connection.rollback()
+            conn.rollback()
+            logging.error(f"Ошибка при сохранении программы: {e}")
             return None
+        finally:
+            self.release_connection(conn)
 
     def save_vacancy(self, name, num, date, file_path):
-        """Сохранение новой вакансии в БД с указанием пути к JSON-файлу."""
+        conn = self.get_connection()
         try:
-            query = """
-                INSERT INTO vacancy (vacancy_name, vacancy_num, vacancty_date, vacancy_file)
-                VALUES (%s, %s, %s, %s)
-                RETURNING vacancy_id;
-            """
-            self.cursor.execute(query, (name, num, date, file_path))
-            self.connection.commit()
-            return self.cursor.fetchone()[0]
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO vacancy (vacancy_name, vacancy_num, vacancty_date, vacancy_file)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING vacancy_id;
+                """, (name, num, date, file_path))
+                vacancy_id = cursor.fetchone()[0]
+            conn.commit()
+            return vacancy_id
         except Error as e:
+            conn.rollback()
             logging.error(f"Ошибка при сохранении вакансии: {e}")
-            self.connection.rollback()
             return None
+        finally:
+            self.release_connection(conn)
 
     def fetch_educational_programs_with_details(self):
-        """Получение данных образовательных программ с расширенной информацией для таблицы."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT 
-                    ep.educational_program_name,
-                    ep.educational_program_code,
-                    ep.educational_program_year,  -- Теперь как текст
-                    u.university_short_name,
-                    tep.type_educational_program_name
-                FROM educational_program ep
-                JOIN university u ON ep.university_id = u.university_id
-                JOIN type_educational_program tep ON ep.type_educational_program_id = tep.type_educational_program_id
-                ORDER BY ep.educational_program_name;
-            """
-            self.cursor.execute(query)
-            return self.cursor.fetchall()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT 
+                        ep.educational_program_name,
+                        ep.educational_program_code,
+                        ep.educational_program_year,
+                        u.university_short_name,
+                        tep.type_educational_program_name
+                    FROM educational_program ep
+                    JOIN university u ON ep.university_id = u.university_id
+                    JOIN type_educational_program tep ON ep.type_educational_program_id = tep.type_educational_program_id
+                    ORDER BY ep.educational_program_name;
+                """)
+                return cursor.fetchall()
         except Error as e:
-            logging.error(f"Ошибка при получении данных образовательных программ: {e}")
+            logging.error(f"Ошибка при получении программ с деталями: {e}")
             return []
+        finally:
+            self.release_connection(conn)
 
     def fetch_program_id_by_name_and_code(self, name, code):
-        """Получение program_id по имени и коду образовательной программы."""
+        conn = self.get_connection()
         try:
-            # Убедимся, что name и code — это строки, и уберём лишние пробелы
-            name = str(name).strip() if name is not None else ""
-            code = str(code).strip() if code is not None else ""
-            logging.debug(f"Fetching program_id with name: '{name}', code: '{code}'")
-
-            query = """
-                SELECT educational_program_id
-                FROM educational_program
-                WHERE educational_program_name = %s AND educational_program_code = %s;
-            """
-            self.cursor.execute(query, (name, code))
-            result = self.cursor.fetchone()
-            logging.debug(f"Query result for name={name}, code={code}: {result}")
-            return result
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT educational_program_id
+                    FROM educational_program
+                    WHERE educational_program_name = %s AND educational_program_code = %s;
+                """, (str(name).strip(), str(code).strip()))
+                return cursor.fetchone()
         except Error as e:
             logging.error(f"Ошибка при получении ID программы: {e}")
             return None
+        finally:
+            self.release_connection(conn)
 
     def fetch_universities(self):
-        """Получение списка ВУЗов из БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT university_full_name, university_short_name, university_city
-                FROM university
-                ORDER BY university_full_name;
-            """
-            self.cursor.execute(query)
-            return self.cursor.fetchall()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT university_full_name, university_short_name, university_city
+                    FROM university
+                    ORDER BY university_full_name;
+                """)
+                return cursor.fetchall()
         except Error as e:
             logging.error(f"Ошибка при получении ВУЗов: {e}")
             return []
+        finally:
+            self.release_connection(conn)
 
     def save_university(self, full_name, short_name, city):
-        """Сохранение нового ВУЗа в БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                INSERT INTO university (university_full_name, university_short_name, university_city)
-                VALUES (%s, %s, %s)
-                RETURNING university_id;
-            """
-            self.cursor.execute(query, (full_name, short_name, city))
-            self.connection.commit()
-            return self.cursor.fetchone()[0]
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO university (university_full_name, university_short_name, university_city)
+                    VALUES (%s, %s, %s)
+                    RETURNING university_id;
+                """, (full_name, short_name, city))
+                university_id = cursor.fetchone()[0]
+            conn.commit()
+            return university_id
         except Error as e:
+            conn.rollback()
             logging.error(f"Ошибка при сохранении ВУЗа: {e}")
-            self.connection.rollback()
             return None
+        finally:
+            self.release_connection(conn)
 
     def fetch_university_id_by_details(self, full_name, short_name, city):
-        """Получение university_id по данным ВУЗа."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT university_id
-                FROM university
-                WHERE university_full_name = %s AND university_short_name = %s AND university_city = %s;
-            """
-            self.cursor.execute(query, (full_name, short_name, city))
-            return self.cursor.fetchone()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT university_id
+                    FROM university
+                    WHERE university_full_name = %s AND university_short_name = %s AND university_city = %s;
+                """, (full_name, short_name, city))
+                return cursor.fetchone()
         except Error as e:
             logging.error(f"Ошибка при получении ID ВУЗа: {e}")
             return None
+        finally:
+            self.release_connection(conn)
 
     def update_university(self, university_id, full_name, short_name, city):
-        """Обновление данных ВУZa в БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                UPDATE university
-                SET university_full_name = %s, university_short_name = %s, university_city = %s
-                WHERE university_id = %s;
-            """
-            self.cursor.execute(query, (full_name, short_name, city, university_id))
-            self.connection.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE university
+                    SET university_full_name = %s, university_short_name = %s, university_city = %s
+                    WHERE university_id = %s;
+                """, (full_name, short_name, city, university_id))
+            conn.commit()
             return True
         except Error as e:
-            logging.error(f"Ошибка при обновлении ВУZa: {e}")
-            self.connection.rollback()
+            conn.rollback()
+            logging.error(f"Ошибка при обновлении ВУЗа: {e}")
             return False
+        finally:
+            self.release_connection(conn)
 
     def delete_university(self, university_id):
-        """Удаление ВУZa из БД."""
+        conn = self.get_connection()
         try:
-            # Сначала проверяем, нет ли связей с образовательными программами
-            check_query = """
-                SELECT COUNT(*) FROM educational_program WHERE university_id = %s;
-            """
-            self.cursor.execute(check_query, (university_id,))
-            if self.cursor.fetchone()[0] > 0:
-                logging.error("Нельзя удалить ВУЗ, так как он связан с образовательными программами.")
-                return False
-
-            # Удаляем ВУЗ
-            delete_query = """
-                DELETE FROM university WHERE university_id = %s;
-            """
-            self.cursor.execute(delete_query, (university_id,))
-            self.connection.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM educational_program WHERE university_id = %s;", (university_id,))
+                if cursor.fetchone()[0] > 0:
+                    logging.error("Нельзя удалить ВУЗ, он связан с программами.")
+                    return False
+                cursor.execute("DELETE FROM university WHERE university_id = %s;", (university_id,))
+            conn.commit()
             return True
         except Error as e:
+            conn.rollback()
             logging.error(f"Ошибка при удалении ВУЗа: {e}")
-            self.connection.rollback()
             return False
+        finally:
+            self.release_connection(conn)
 
     def fetch_educational_program_types(self):
-        """Получение списка типов образовательных программ из БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT type_educational_program_id, type_educational_program_name
-                FROM type_educational_program
-                ORDER BY type_educational_program_name;
-            """
-            self.cursor.execute(query)
-            return self.cursor.fetchall()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT type_educational_program_id, type_educational_program_name
+                    FROM type_educational_program
+                    ORDER BY type_educational_program_name;
+                """)
+                return cursor.fetchall()
         except Error as e:
-            logging.error(f"Ошибка при получении типов образовательных программ: {e}")
+            logging.error(f"Ошибка при получении типов программ: {e}")
             return []
+        finally:
+            self.release_connection(conn)
 
     def fetch_university_by_short_name(self, short_name):
-        """Получение данных ВУЗа по краткому наименованию."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT university_id, university_full_name, university_short_name, university_city
-                FROM university
-                WHERE university_short_name = %s;
-            """
-            self.cursor.execute(query, (short_name,))
-            return self.cursor.fetchone()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT university_id, university_full_name, university_short_name, university_city
+                    FROM university
+                    WHERE university_short_name = %s;
+                """, (short_name,))
+                return cursor.fetchone()
         except Error as e:
-            logging.error(f"Ошибка при получении ВУЗа по краткому наименованию: {e}")
+            logging.error(f"Ошибка при получении ВУЗа: {e}")
             return None
+        finally:
+            self.release_connection(conn)
 
     def fetch_educational_program_type_by_name(self, type_name):
-        """Получение type_educational_program_id по названию типа программы."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT type_educational_program_id
-                FROM type_educational_program
-                WHERE type_educational_program_name = %s;
-            """
-            self.cursor.execute(query, (type_name,))
-            return self.cursor.fetchone()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT type_educational_program_id
+                    FROM type_educational_program
+                    WHERE type_educational_program_name = %s;
+                """, (type_name,))
+                return cursor.fetchone()
         except Error as e:
-            logging.error(f"Ошибка при получения ID типа программы: {e}")
+            logging.error(f"Ошибка при получении ID типа программы: {e}")
             return None
+        finally:
+            self.release_connection(conn)
 
     def update_educational_program(self, program_id, name, code, university_id, year, type_program_id):
-        """Обновление данных образовательной программы в БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                UPDATE educational_program
-                SET educational_program_name = %s, educational_program_code = %s, 
-                    university_id = %s, educational_program_year = %s, 
-                    type_educational_program_id = %s
-                WHERE educational_program_id = %s;
-            """
-            self.cursor.execute(query, (name, code, university_id, year, type_program_id, program_id))
-            self.connection.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE educational_program
+                    SET educational_program_name = %s, educational_program_code = %s, 
+                        university_id = %s, educational_program_year = %s, 
+                        type_educational_program_id = %s
+                    WHERE educational_program_id = %s;
+                """, (name, code, university_id, year, type_program_id, program_id))
+            conn.commit()
             return True
         except Error as e:
-            logging.error(f"Ошибка при обновлении образовательной программы: {e}")
-            self.connection.rollback()
+            conn.rollback()
+            logging.error(f"Ошибка при обновлении программы: {e}")
             return False
+        finally:
+            self.release_connection(conn)
 
     def delete_educational_program(self, program_id):
-        """Удаление образовательной программы из БД."""
+        conn = self.get_connection()
         try:
-            # Удаляем связанные записи в competence_educational_program
-            delete_competence_query = """
-                DELETE FROM competence_educational_program 
-                WHERE educational_program_id = %s;
-            """
-            self.cursor.execute(delete_competence_query, (program_id,))
-
-            # Удаляем образовательную программу
-            delete_program_query = """
-                DELETE FROM educational_program 
-                WHERE educational_program_id = %s;
-            """
-            self.cursor.execute(delete_program_query, (program_id,))
-            self.connection.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM competence_educational_program WHERE educational_program_id = %s;", (program_id,))
+                cursor.execute("DELETE FROM educational_program WHERE educational_program_id = %s;", (program_id,))
+            conn.commit()
             return True
         except Error as e:
-            logging.error(f"Ошибка при удалении образовательной программы: {e}")
-            self.connection.rollback()
+            conn.rollback()
+            logging.error(f"Ошибка при удалении программы: {e}")
             return False
+        finally:
+            self.release_connection(conn)
 
     def fetch_competence_types(self):
-        """Получение списка типов компетенций из БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT type_competence_id, type_competence_full_name
-                FROM type_competence
-                ORDER BY type_competence_full_name;
-            """
-            self.cursor.execute(query)
-            return self.cursor.fetchall()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT type_competence_id, type_competence_full_name
+                    FROM type_competence
+                    ORDER BY type_competence_full_name;
+                """)
+                return cursor.fetchall()
         except Error as e:
             logging.error(f"Ошибка при получении типов компетенций: {e}")
             return []
+        finally:
+            self.release_connection(conn)
 
     def fetch_competence_by_name(self, competence_name):
-        """Получение данных компетенции по её названию."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT competence_id, competence_name, type_competence_id
-                FROM competence
-                WHERE competence_name = %s;
-            """
-            self.cursor.execute(query, (competence_name,))
-            return self.cursor.fetchone()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT competence_id, competence_name, type_competence_id
+                    FROM competence
+                    WHERE competence_name = %s;
+                """, (competence_name,))
+                return cursor.fetchone()
         except Error as e:
-            logging.error(f"Ошибка при получении компетенции по названию: {e}")
+            logging.error(f"Ошибка при получении компетенции: {e}")
             return None
+        finally:
+            self.release_connection(conn)
 
     def save_competence(self, competence_name, type_competence_id):
-        """Сохранение новой компетенции в БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                INSERT INTO competence (competence_name, type_competence_id)
-                VALUES (%s, %s)
-                RETURNING competence_id;
-            """
-            self.cursor.execute(query, (competence_name, type_competence_id))
-            self.connection.commit()
-            return self.cursor.fetchone()[0]
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO competence (competence_name, type_competence_id)
+                    VALUES (%s, %s)
+                    RETURNING competence_id;
+                """, (competence_name, type_competence_id))
+                competence_id = cursor.fetchone()[0]
+            conn.commit()
+            return competence_id
         except Error as e:
+            conn.rollback()
             logging.error(f"Ошибка при сохранении компетенции: {e}")
-            self.connection.rollback()
             return None
+        finally:
+            self.release_connection(conn)
 
     def update_competence(self, competence_id, competence_name, type_competence_id):
-        """Обновление данных компетенции в БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                UPDATE competence
-                SET competence_name = %s, type_competence_id = %s
-                WHERE competence_id = %s;
-            """
-            self.cursor.execute(query, (competence_name, type_competence_id, competence_id))
-            self.connection.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE competence
+                    SET competence_name = %s, type_competence_id = %s
+                    WHERE competence_id = %s;
+                """, (competence_name, type_competence_id, competence_id))
+            conn.commit()
             return True
         except Error as e:
+            conn.rollback()
             logging.error(f"Ошибка при обновлении компетенции: {e}")
-            self.connection.rollback()
             return False
+        finally:
+            self.release_connection(conn)
 
     def delete_competence(self, competence_id):
-        """Удаление компетенции из БД."""
+        conn = self.get_connection()
         try:
-            # Сначала проверяем, нет ли связей с образовательными программами
-            check_query = """
-                SELECT COUNT(*) FROM competence_educational_program WHERE competence_id = %s;
-            """
-            self.cursor.execute(check_query, (competence_id,))
-            if self.cursor.fetchone()[0] > 0:
-                logging.error("Нельзя удалить компетенцию, так как она связана с образовательными программами.")
-                return False
-
-            # Удаляем компетенцию
-            delete_query = """
-                DELETE FROM competence WHERE competence_id = %s;
-            """
-            self.cursor.execute(delete_query, (competence_id,))
-            self.connection.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM competence_educational_program WHERE competence_id = %s;", (competence_id,))
+                if cursor.fetchone()[0] > 0:
+                    logging.error("Нельзя удалить компетенцию, она связана с программами.")
+                    return False
+                cursor.execute("DELETE FROM competence WHERE competence_id = %s;", (competence_id,))
+            conn.commit()
             return True
         except Error as e:
+            conn.rollback()
             logging.error(f"Ошибка при удалении компетенции: {e}")
-            self.connection.rollback()
             return False
+        finally:
+            self.release_connection(conn)
 
     def fetch_competences_for_program(self, program_id):
-        """Получение списка компетенций для образовательной программы из БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                SELECT c.competence_name, tc.type_competence_full_name
-                FROM competence_educational_program cep
-                JOIN competence c ON cep.competence_id = c.competence_id
-                JOIN type_competence tc ON c.type_competence_id = tc.type_competence_id
-                WHERE cep.educational_program_id = %s;
-            """
-            self.cursor.execute(query, (program_id,))
-            return self.cursor.fetchall()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT c.competence_name, tc.type_competence_full_name
+                    FROM competence_educational_program cep
+                    JOIN competence c ON cep.competence_id = c.competence_id
+                    JOIN type_competence tc ON c.type_competence_id = tc.type_competence_id
+                    WHERE cep.educational_program_id = %s;
+                """, (program_id,))
+                return cursor.fetchall()
         except Error as e:
             logging.error(f"Ошибка при получении компетенций программы: {e}")
             return []
+        finally:
+            self.release_connection(conn)
 
     def save_competence_for_program(self, competence_id, type_competence_id, program_id):
-        """Сохранение связи компетенции с образовательной программой в БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
-                VALUES (%s, %s, %s);
-            """
-            self.cursor.execute(query, (competence_id, type_competence_id, program_id))
-            self.connection.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
+                    VALUES (%s, %s, %s);
+                """, (competence_id, type_competence_id, program_id))
+            conn.commit()
             return True
         except Error as e:
-            logging.error(f"Ошибка при сохранении связи компетенции с программой: {e}")
-            self.connection.rollback()
+            conn.rollback()
+            logging.error(f"Ошибка при сохранении компетенции для программы: {e}")
             return False
+        finally:
+            self.release_connection(conn)
 
     def update_competence_for_program(self, old_competence_id, old_type_competence_id, program_id, new_competence_id, new_type_competence_id):
-        """Обновление связи компетенции с образовательной программой в БД."""
+        conn = self.get_connection()
         try:
-            # Удаляем старую связь
-            delete_query = """
-                DELETE FROM competence_educational_program 
-                WHERE competence_id = %s AND type_competence_id = %s AND educational_program_id = %s;
-            """
-            self.cursor.execute(delete_query, (old_competence_id, old_type_competence_id, program_id))
-
-            # Добавляем новую связь
-            insert_query = """
-                INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
-                VALUES (%s, %s, %s);
-            """
-            self.cursor.execute(insert_query, (new_competence_id, new_type_competence_id, program_id))
-            self.connection.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    DELETE FROM competence_educational_program 
+                    WHERE competence_id = %s AND type_competence_id = %s AND educational_program_id = %s;
+                """, (old_competence_id, old_type_competence_id, program_id))
+                cursor.execute("""
+                    INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
+                    VALUES (%s, %s, %s);
+                """, (new_competence_id, new_type_competence_id, program_id))
+            conn.commit()
             return True
         except Error as e:
-            logging.error(f"Ошибка при обновлении связи компетенции с программой: {e}")
-            self.connection.rollback()
+            conn.rollback()
+            logging.error(f"Ошибка при обновлении компетенции для программы: {e}")
             return False
+        finally:
+            self.release_connection(conn)
 
     def delete_competence_for_program(self, competence_id, type_competence_id, program_id):
-        """Удаление связи компетенции с образовательной программой из БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                DELETE FROM competence_educational_program 
-                WHERE competence_id = %s AND type_competence_id = %s AND educational_program_id = %s;
-            """
-            self.cursor.execute(query, (competence_id, type_competence_id, program_id))
-            self.connection.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    DELETE FROM competence_educational_program 
+                    WHERE competence_id = %s AND type_competence_id = %s AND educational_program_id = %s;
+                """, (competence_id, type_competence_id, program_id))
+            conn.commit()
             return True
         except Error as e:
-            logging.error(f"Ошибка при удалении связи компетенции с программой: {e}")
-            self.connection.rollback()
+            conn.rollback()
+            logging.error(f"Ошибка при удалении компетенции для программы: {e}")
             return False
-        
+        finally:
+            self.release_connection(conn)
+
     def update_vacancy(self, vacancy_id, name, num, date, file_path):
-        """Обновление данных вакансии в БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                UPDATE vacancy
-                SET vacancy_name = %s, vacancy_num = %s, vacancty_date = %s, vacancy_file = %s
-                WHERE vacancy_id = %s;
-            """
-            self.cursor.execute(query, (name, num, date, file_path, vacancy_id))
-            self.connection.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE vacancy
+                    SET vacancy_name = %s, vacancy_num = %s, vacancty_date = %s, vacancy_file = %s
+                    WHERE vacancy_id = %s;
+                """, (name, num, date, file_path, vacancy_id))
+            conn.commit()
             return True
         except Error as e:
+            conn.rollback()
             logging.error(f"Ошибка при обновлении вакансии: {e}")
-            self.connection.rollback()
             return False
-        
-
-    def fetch_vacancy_id_by_details(self, name, quantity, date, file_path):
-        try:
-            query = """
-                SELECT vacancy_id
-                FROM vacancy
-                WHERE vacancy_name = %s AND vacancy_num = %s AND vacancty_date = %s AND vacancy_file = %s;
-            """
-            self.cursor.execute(query, (name, int(quantity), date, file_path))
-            return self.cursor.fetchone()
-        except ValueError as ve:
-            logging.error(f"Неверный формат данных для quantity: {ve}")
-            return None
-        except Error as e:
-            logging.error(f"Ошибка при получении ID вакансии: {e}")
-            return None
-
-    def update_vacancy(self, vacancy_id, name, quantity, date, file_path):
-        """Обновление данных вакансии в БД."""
-        try:
-            query = """
-                UPDATE vacancy
-                SET vacancy_name = %s, vacancy_num = %s, vacancty_date = %s, vacancy_file = %s
-                WHERE vacancy_id = %s;
-            """
-            self.cursor.execute(query, (str(name), int(quantity), date, file_path, vacancy_id))
-            self.connection.commit()
-            return True
-        except ValueError as ve:
-            logging.error(f"Неверный формат данных для quantity: {ve}")
-            self.connection.rollback()
-            return False
-        except Error as e:
-            logging.error(f"Ошибка при обновлении вакансии: {e}")
-            self.connection.rollback()
-            return False
+        finally:
+            self.release_connection(conn)
 
     def delete_vacancy(self, vacancy_id):
-        """Удаление вакансии из БД."""
+        conn = self.get_connection()
         try:
-            query = """
-                DELETE FROM vacancy WHERE vacancy_id = %s;
-            """
-            self.cursor.execute(query, (vacancy_id,))
-            self.connection.commit()
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM vacancy WHERE vacancy_id = %s;", (vacancy_id,))
+            conn.commit()
             return True
         except Error as e:
+            conn.rollback()
             logging.error(f"Ошибка при удалении вакансии: {e}")
-            self.connection.rollback()
             return False
+        finally:
+            self.release_connection(conn)

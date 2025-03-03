@@ -1,13 +1,14 @@
 import tkinter as tk
-import os
-from tkinter import filedialog
-from tkinter import ttk
+from tkinter import filedialog, ttk
 import logging
-from moduls.database import Database
-from moduls.labor_market_data import LaborMarketData  # Новый импорт
+from moduls.labor_market_data import LaborMarketData
 from datetime import datetime
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 def create_vacancies_tab(frame, app):
+    app.vac_executor = ThreadPoolExecutor(max_workers=1)  # Для асинхронных задач
+
     container_frame = tk.Frame(frame)
     container_frame.pack(pady=5, padx=5, fill="both", expand=False)
 
@@ -20,8 +21,8 @@ def create_vacancies_tab(frame, app):
     app.vacancies_table.heading("quantity", text="Количество вакансий")
     app.vacancies_table.heading("collection_date", text="Дата сбора")
     app.vacancies_table.heading("file", text="Файл вакансий")
-    app.vacancies_table.column("id", width=0, stretch=False)  # Скрываем столбец "id"
-    app.vacancies_table.column("name", width=200)  # Увеличено для общей ширины ~900
+    app.vacancies_table.column("id", width=0, stretch=False)
+    app.vacancies_table.column("name", width=200)
     app.vacancies_table.column("quantity", width=150)
     app.vacancies_table.column("collection_date", width=150)
     app.vacancies_table.column("file", width=400)
@@ -43,19 +44,17 @@ def create_vacancies_tab(frame, app):
     app.selected_vacancy_label = tk.Label(select_frame, text="Выбрана вакансия: Нет")
     app.selected_vacancy_label.pack(side=tk.LEFT, padx=5)
 
-    # Создаём новый фрейм для поиска вакансий
     search_vacancies_frame = tk.Frame(frame)
     search_vacancies_frame.pack(pady=5)
 
-    # Добавляем текст, поле ввода и кнопку поиска в новый фрейм
-    tk.Label(search_vacancies_frame, text="Поисковый запрос вакансии:").pack(side=tk.LEFT, padx=5)
+    tk.Label(search_vacancies_frame, text="Поисковый запрос:").pack(side=tk.LEFT, padx=5)
     app.search_query_entry = tk.Entry(search_vacancies_frame)
     app.search_query_entry.pack(side=tk.LEFT, padx=5)
-    tk.Button(search_vacancies_frame, text="Поиск вакансий", command=lambda: search_vacancies(app)).pack(side=tk.LEFT, padx=5)
+    tk.Button(search_vacancies_frame, text="Поиск вакансий", command=lambda: app.vac_executor.submit(search_vacancies, app)).pack(side=tk.LEFT, padx=5)
+
     load_vacancies_table(app)
 
-def search_vacancies(app):
-    """Функция для поиска вакансий через LaborMarketData и добавления в таблицу после полного сбора."""
+async def search_vacancies(app):
     query = app.search_query_entry.get().strip()
     if not query:
         app.show_error("Введите поисковый запрос!")
@@ -64,51 +63,40 @@ def search_vacancies(app):
     ACCESS_TOKEN = "APPLRDK45780T0N5LTCCGEC9DU19NPGSORRJP5535R95VETEF4203PHSQI97V49C"
     hh_data = LaborMarketData(query=query, access_token=ACCESS_TOKEN)
     try:
-        hh_data.collect_all_vacancies()
-        current_date_time = datetime.now().strftime("%Y-%m-%d %H-%M")  # Формат YYYY-MM-DD HH-MI
+        await hh_data.collect_all_vacancies()
+        current_date_time = datetime.now().strftime("%Y-%m-%d %H-%M")
         filename = f"vacancies_hh/{query} {current_date_time}.json"
-        hh_data.save_to_json(filename)  # Сначала собираем и сохраняем все вакансии
-        
-        # После сбора всех вакансий добавляем запись в БД
-        vacancy_name = query
-        vacancy_quantity = len(hh_data.vacancies)
-        vacancy_date = current_date_time
-        vacancy_file = f"{query} {current_date_time}.json"
+        await hh_data.save_to_json(filename)
 
-        vacancy_id = app.logic.db.save_vacancy(vacancy_name, vacancy_quantity, vacancy_date, vacancy_file)
+        vacancy_id = app.logic.db.save_vacancy(query, len(hh_data.vacancies), current_date_time, filename)
         if vacancy_id:
-            app.show_info(f"Вакансии сохранены в {filename} и добавлены в БД (ID: {vacancy_id})")
+            app.show_info(f"Вакансии сохранены в {filename} (ID: {vacancy_id})")
+            load_vacancies_table(app)
         else:
-            app.show_error("Не удалось сохранить вакансию в БД!")
-        
-        # Обновляем таблицу после добавления в БД
-        load_vacancies_table(app)
+            app.show_error("Ошибка сохранения в БД!")
     except Exception as e:
-        app.show_error(f"Ошибка при сборе вакансий: {e}")
-        logging.error(f"Ошибка при сборе вакансий для запроса '{query}': {e}")
+        app.show_error(f"Ошибка сбора вакансий: {e}")
+        logging.error(f"Ошибка сбора вакансий '{query}': {e}")
 
 def on_vacancy_select(app):
     selected_item = app.vacancies_table.selection()
     if not selected_item:
-        logging.error("Выберите вакансию в таблице!")
-        app.show_error("Выберите вакансию в таблице!")
+        app.show_error("Выберите вакансию!")
         return
 
     values = app.vacancies_table.item(selected_item[0])['values']
-    vacancy_id = values[0]
-    vacancy_name = values[1]
-    app.selected_vacancy_id = vacancy_id  # Сохраняем ID для анализа
-    app.selected_vacancy_label.config(text=f"Выбрана вакансия: {vacancy_name} (ID: {vacancy_id})")
-    logging.info(f"Выбрана вакансия: {vacancy_name}, ID: {vacancy_id}")
+    app.selected_vacancy_id = values[0]
+    app.selected_vacancy_label.config(text=f"Выбрана вакансия: {values[1]} (ID: {values[0]})")
+    logging.info(f"Выбрана вакансия: {values[1]}, ID: {values[0]}")
 
 def load_vacancies_table(app):
     try:
         vacancies = app.logic.db.fetch_vacancies()
         app.vacancies_table.delete(*app.vacancies_table.get_children())
         for vacancy in vacancies:
-            app.vacancies_table.insert("", tk.END, values=(vacancy[0], vacancy[1], vacancy[2], vacancy[3], vacancy[4]))
+            app.vacancies_table.insert("", tk.END, values=vacancy)
     except Exception as e:
-        logging.error(f"Ошибка при загрузке вакансий: {e}")
+        logging.error(f"Ошибка загрузки вакансий: {e}")
 
 def edit_vacancy_window(app, selected_item, action):
     if action == "edit" and not selected_item:
@@ -134,8 +122,8 @@ def edit_vacancy_window(app, selected_item, action):
     tk.Label(window, text="Файл вакансий:").pack(pady=5)
     file_entry = tk.Entry(window)
     file_entry.pack(pady=5)
-    tk.Button(window, text="Выбрать файл", command=lambda: file_entry.insert(tk.END, os.path.basename(filedialog.askopenfilename()))).pack(pady=5)
-    
+    tk.Button(window, text="Выбрать файл", command=lambda: file_entry.insert(tk.END, filedialog.askopenfilename())).pack(pady=5)
+
     if action == "edit":
         values = app.vacancies_table.item(selected_item[0])['values']
         name_entry.insert(0, values[1])
@@ -150,27 +138,24 @@ def save_vacancy(app, window, name, quantity, date, file_path, action, selected_
         if not all([name, quantity, date, file_path]):
             logging.error("Все поля должны быть заполнены!")
             return
-
         quantity = int(quantity)
         if action == "add":
             vacancy_id = app.logic.db.save_vacancy(name, quantity, date, file_path)
             if vacancy_id:
                 load_vacancies_table(app)
                 logging.info(f"Вакансия '{name}' добавлена!")
-        elif action == "edit":
-            if selected_item:
-                values = app.vacancies_table.item(selected_item[0])['values']
-                vacancy_id = values[0]
-                if app.logic.db.update_vacancy(vacancy_id, name, quantity, date, file_path):
-                    load_vacancies_table(app)
-                    logging.info(f"Вакансия '{name}' обновлена!")
+        elif action == "edit" and selected_item:
+            values = app.vacancies_table.item(selected_item[0])['values']
+            if app.logic.db.update_vacancy(values[0], name, quantity, date, file_path):
+                load_vacancies_table(app)
+                logging.info(f"Вакансия '{name}' обновлена!")
         window.destroy()
     except ValueError as ve:
-        logging.error(f"Неверный формат данных: {ve}")
-        app.show_error("Количество вакансий должно быть числом!")
+        logging.error(f"Неверный формат: {ve}")
+        app.show_error("Количество должно быть числом!")
     except Exception as e:
-        logging.error(f"Ошибка при сохранении вакансии: {e}")
-        app.show_error("Произошла ошибка при сохранении вакансии!")
+        logging.error(f"Ошибка сохранения: {e}")
+        app.show_error("Ошибка сохранения!")
 
 def delete_vacancy(app):
     selected_item = app.vacancies_table.selection()
@@ -178,12 +163,10 @@ def delete_vacancy(app):
         logging.error("Выберите вакансию для удаления!")
         return
 
+    values = app.vacancies_table.item(selected_item[0])['values']
     try:
-        values = app.vacancies_table.item(selected_item[0])['values']
-        vacancy_id = values[0]
-        if app.logic.db.delete_vacancy(vacancy_id):
+        if app.logic.db.delete_vacancy(values[0]):
             load_vacancies_table(app)
             logging.info(f"Вакансия '{values[1]}' удалена!")
     except Exception as e:
-        logging.error(f"Ошибка при удалении вакансии: {e}")
-
+        logging.error(f"Ошибка удаления: {e}")

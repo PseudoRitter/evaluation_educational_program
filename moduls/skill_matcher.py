@@ -4,45 +4,51 @@ import logging
 import gc
 
 class SkillMatcher:
-    def __init__(self, device="cpu"):
-        try:
-            self.device = device
-            model_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
-            #model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-            self.model = SentenceTransformer(model_name)
-            self.model.to(self.device)
-            logging.info(f"SkillMatcher модель загружена на устройство: {self.device}")
-        except Exception as e:
-            logging.error(f"Ошибка при инициализации SkillMatcher: {e}", exc_info=True)
-            raise
+    def __init__(self, device="cpu", model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2"):
+        self.device = device
+        self.model_name = model_name
+        self.model = None  # Ленивая загрузка модели
+        logging.info(f"SkillMatcher инициализирован для устройства: {self.device}")
+
+    def initialize_model(self):
+        """Публичный метод для явной инициализации модели (для совместимости)."""
+        self._load_model()
+
+    def _load_model(self):
+        """Ленивая загрузка модели."""
+        if self.model is None:
+            try:
+                self.model = SentenceTransformer(self.model_name)
+                self.model.to(self.device)
+                logging.info(f"Модель {self.model_name} загружена на {self.device}")
+            except Exception as e:
+                logging.error(f"Ошибка загрузки модели: {e}", exc_info=True)
+                raise
 
     def match_skills(self, program_skills, job_descriptions, batch_size=64):
         try:
             if not program_skills or not job_descriptions:
-                logging.warning("Нет данных для анализа схожести навыков.")
+                logging.warning("Нет данных для анализа навыков.")
                 return {"sentence_transformer": {}}
 
-            job_embeddings = self._encode_in_batches(job_descriptions, batch_size).to(self.device)
-            skill_embeddings = self._encode_in_batches(program_skills, batch_size).to(self.device)
-            similarity_matrix = util.pytorch_cos_sim(skill_embeddings, job_embeddings)
+            self._load_model()  # Убедимся, что модель загружена
+            job_embeddings = self._encode_in_batches(job_descriptions, batch_size)
+            skill_embeddings = self._encode_in_batches(program_skills, batch_size)
+            
+            similarity_results = {}
+            for i in range(0, len(program_skills), batch_size):
+                batch_skills = program_skills[i:i + batch_size]
+                batch_embeddings = skill_embeddings[i:i + batch_size]
+                similarity_matrix = util.pytorch_cos_sim(batch_embeddings, job_embeddings)
+                for j, skill in enumerate(batch_skills):
+                    similarity_results[skill.strip()] = similarity_matrix[j].mean().item()
 
-            results = {}
-            for i, skill in enumerate(program_skills):
-                avg_similarity = similarity_matrix[i].mean().item()
-                results[skill.strip()] = avg_similarity
-
-            return {"sentence_transformer": results}
+            return {"sentence_transformer": similarity_results}
         except Exception as e:
-            logging.error(f"Ошибка при вычислении схожести навыков: {e}", exc_info=True)
+            logging.error(f"Ошибка вычисления сходства: {e}", exc_info=True)
             raise
         finally:
-            # Очистка кэша GPU после классификации
-            if self.device == "cuda":
-                logging.info("Очистка кэша GPU после классификации...")
-                self.model.to("cpu")  # Перемещаем модель на CPU
-                del self.model       # Удаляем модель из памяти
-                gc.collect()         # Вызываем сборщик мусора
-                torch.cuda.empty_cache()  # Очищаем кэш GPU
+            self._cleanup_memory()
 
     def _encode_in_batches(self, texts, batch_size):
         try:
@@ -51,9 +57,17 @@ class SkillMatcher:
                 batch = texts[i:i + batch_size]
                 if not batch:
                     continue
-                embeddings = self.model.encode(batch, convert_to_tensor=True)
+                embeddings = self.model.encode(batch, convert_to_tensor=True, device=self.device, show_progress_bar=False)
                 all_embeddings.append(embeddings)
-            return torch.cat(all_embeddings, dim=0) if all_embeddings else torch.tensor([])
+                if self.device == "cuda":
+                    torch.cuda.empty_cache()
+            return torch.cat(all_embeddings, dim=0) if all_embeddings else torch.tensor([], device=self.device)
         except Exception as e:
-            logging.error(f"Ошибка при кодировании текстов в SkillMatcher: {e}", exc_info=True)
+            logging.error(f"Ошибка кодирования: {e}", exc_info=True)
             raise
+
+    def _cleanup_memory(self):
+        if self.device == "cuda":
+            logging.info("Очистка кэша GPU в SkillMatcher...")
+            gc.collect()
+            torch.cuda.empty_cache()
