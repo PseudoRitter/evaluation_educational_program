@@ -64,7 +64,7 @@ async def search_vacancies(app):
     hh_data = LaborMarketData(query=query, access_token=ACCESS_TOKEN)
     try:
         await hh_data.collect_all_vacancies()
-        current_date_time = datetime.now().strftime("%Y-%m-%d %H-%M")
+        current_date_time = datetime.now().strftime("%Y-%m-%d %H:%M")
         filename = f"vacancies_hh/{query} {current_date_time}.json"
         await hh_data.save_to_json(filename)
 
