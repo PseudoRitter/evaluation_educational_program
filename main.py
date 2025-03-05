@@ -3,18 +3,26 @@ import logging
 from gui.app import App
 from logic import Logic
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler()]
-)
+def configure_logging():
+    """Настройка логирования для приложения."""
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[logging.StreamHandler()]
+    )
 
-if __name__ == "__main__":
-    root = tk.Tk()  # Создание главного окна
-    logic = Logic()  # Создание объекта логики
-    app = App(root, logic)  # Передаем логику в интерфейс и инициализируем приложение
+def main():
+    """Запуск приложения для оценки соответствия образовательных программ."""
+    configure_logging()
+    
+    root = tk.Tk()
+    logic = Logic()
+    app = App(root, logic)
     
     try:
-        root.mainloop()  # Запуск основного цикла обработки событий
+        root.mainloop()
     except Exception as e:
-        logging.error(f"Ошибка в main.py: {e}", exc_info=True)
+        logging.error(f"Ошибка в приложении: {e}", exc_info=True)
+
+if __name__ == "__main__":
+    main()

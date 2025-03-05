@@ -3,15 +3,17 @@ from tkinter import ttk
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
-from .education_tab import create_education_tab, load_education_table, preview_competences
+from .education_tab import create_education_tab
 from .vacancies_tab import create_vacancies_tab
 from .debug_tab import create_debug_tab
 from .assessment_tab import create_assessment_tab
-from .add_program_window import create_add_program_window
 from .assessment_history_tab import create_rating_history_tab
 
 class App:
+    """Основной класс приложения для оценки соответствия образовательных программ."""
+
     def __init__(self, root, logic):
+        """Инициализация приложения с главным окном и логикой."""
         self.root = root
         self.logic = logic
         self.root.title("Оценка соответствия образовательной программы")
@@ -23,13 +25,13 @@ class App:
         self.load_initial_data()
 
     def create_widgets(self):
+        """Создание вкладок интерфейса."""
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(pady=10, expand=True, fill="both")
 
         self.education_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.education_tab, text="ОП")
         create_education_tab(self.education_tab, self)
-        self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
 
         self.vacancies_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.vacancies_tab, text="Вакансии")
@@ -47,17 +49,22 @@ class App:
         self.notebook.add(self.rating_history_tab, text="История оценок")
         create_rating_history_tab(self.rating_history_tab, self)
 
+        self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
+
     def on_tab_changed(self, event):
         """Обработка смены вкладки."""
-        if self.notebook.tab(self.notebook.select())['text'] == "ОП":
+        selected_tab = self.notebook.tab(self.notebook.select(), "text")
+        if selected_tab == "ОП":
+            from .education_tab import load_education_table
             load_education_table(self)
 
     def load_initial_data(self):
-        """Загрузка начальных данных без лишних проверок."""
+        """Асинхронная загрузка начальных данных."""
         self.executor.submit(self.load_programs)
         self.executor.submit(self.load_vacancies)
 
     def load_programs(self):
+        """Загрузка образовательных программ."""
         try:
             programs = self.logic.db.fetch_educational_programs()
             logging.info(f"Загружено {len(programs)} программ")
@@ -66,6 +73,7 @@ class App:
             self.show_error(f"Не удалось загрузить программы: {e}")
 
     def load_vacancies(self):
+        """Загрузка вакансий."""
         try:
             vacancies = self.logic.db.fetch_vacancies()
             logging.info(f"Загружено {len(vacancies)} вакансий")
@@ -74,13 +82,15 @@ class App:
             self.show_error(f"Не удалось загрузить вакансии: {e}")
 
     def start_analysis(self):
+        """Запуск анализа соответствия."""
         future = self.executor.submit(self.logic.run_analysis, self.program_id, self.selected_vacancy_id, self, 64)
         future.add_done_callback(self.on_analysis_complete)
 
     def on_analysis_complete(self, future):
+        """Обработка завершения анализа."""
         try:
             results = future.result()
-            if not results or 'similarity_results' not in results:
+            if not results or "similarity_results" not in results:
                 self.show_error("Анализ не выполнен: данные недоступны")
                 return
             self.update_results(results)
@@ -89,12 +99,15 @@ class App:
             self.show_error(f"Ошибка: {e}")
 
     def show_error(self, message):
+        """Отображение сообщения об ошибке."""
         logging.error(f"GUI Error: {message}")
 
     def show_info(self, message):
+        """Отображение информационного сообщения."""
         logging.info(f"GUI Info: {message}")
 
     def update_results(self, results):
+        """Обновление интерфейса результатами анализа."""
         try:
             self.result_text_area.delete(1.0, tk.END)
             self.skill_results_table.delete(*self.skill_results_table.get_children())
@@ -112,6 +125,7 @@ class App:
             self.show_error(f"Ошибка обновления: {e}")
 
     def update_classification_table(self, classified_sentences):
+        """Обновление таблицы классификации."""
         try:
             self.classification_table.delete(*self.classification_table.get_children())
             category_mapping = {0: "Требования", 1: "О компании/условия"}
@@ -121,6 +135,6 @@ class App:
             logging.error(f"Ошибка обновления классификации: {e}", exc_info=True)
             self.show_error(f"Ошибка классификации: {e}")
 
-    @staticmethod
-    def validate(possible_new_value):
-        return bool(re.match(r'^[0-9a-fA-F]*$', possible_new_value))
+    def validate(self, possible_new_value):
+        """Проверка ввода на соответствие шестнадцатеричному формату."""
+        return bool(re.match(r"^[0-9a-fA-F]*$", possible_new_value))

@@ -1,27 +1,36 @@
 import tkinter as tk
-from tkinter import filedialog, ttk
+from tkinter import ttk, filedialog
 import logging
 from moduls.labor_market_data import LaborMarketData
 from datetime import datetime
 import asyncio
-import os  
+import os
 from concurrent.futures import ThreadPoolExecutor
+from moduls.table_sort import sort_treeview_column  
+
 
 def create_vacancies_tab(frame, app):
-    app.vac_executor = ThreadPoolExecutor(max_workers=1)  # Для асинхронных задач
+    """Создание вкладки для работы с вакансиями."""
+    app.vac_executor = ThreadPoolExecutor(max_workers=1)
 
+    # Контейнер для таблицы и кнопок
     container_frame = tk.Frame(frame)
     container_frame.pack(pady=5, padx=5, fill="both", expand=False)
 
     vacancies_frame = ttk.LabelFrame(container_frame, text="Вакансии с сайта")
     vacancies_frame.pack(side=tk.LEFT, pady=5, padx=5, fill="both", expand=True)
 
-    app.vacancies_table = ttk.Treeview(vacancies_frame, columns=("id", "name", "quantity", "collection_date", "file"), show="headings", height=10)
+    app.vacancies_table = ttk.Treeview(
+        vacancies_frame,
+        columns=("id", "name", "quantity", "collection_date", "file"),
+        show="headings",
+        height=10
+    )
     app.vacancies_table.heading("id", text="ID")
-    app.vacancies_table.heading("name", text="Название вакансии")
-    app.vacancies_table.heading("quantity", text="Количество вакансий")
-    app.vacancies_table.heading("collection_date", text="Дата сбора")
-    app.vacancies_table.heading("file", text="Файл вакансий")
+    app.vacancies_table.heading("name", text="Название вакансии", command=lambda: sort_treeview_column(app.vacancies_table, "name", False))
+    app.vacancies_table.heading("quantity", text="Количество вакансий", command=lambda: sort_treeview_column(app.vacancies_table, "quantity", False))
+    app.vacancies_table.heading("collection_date", text="Дата сбора", command=lambda: sort_treeview_column(app.vacancies_table, "collection_date", False))
+    app.vacancies_table.heading("file", text="Файл вакансий", command=lambda: sort_treeview_column(app.vacancies_table, "file", False))
     app.vacancies_table.column("id", width=0, stretch=False)
     app.vacancies_table.column("name", width=200)
     app.vacancies_table.column("quantity", width=150)
@@ -29,25 +38,24 @@ def create_vacancies_tab(frame, app):
     app.vacancies_table.column("file", width=400)
     app.vacancies_table.pack(pady=5, fill="both", expand=True)
 
+    # Кнопки управления
     button_frame = tk.Frame(container_frame)
     button_frame.pack(side=tk.LEFT, padx=10, fill="y")
-
     tk.Button(button_frame, text="Добавить", command=lambda: edit_vacancy_window(app, None, "add")).pack(pady=5)
     tk.Button(button_frame, text="Редактировать", command=lambda: edit_vacancy_window(app, app.vacancies_table.selection(), "edit")).pack(pady=5)
     tk.Button(button_frame, text="Удалить", command=lambda: delete_vacancy(app)).pack(pady=5)
 
+    # Кнопка выбора и метка
     select_frame = tk.Frame(frame)
     select_frame.pack(pady=5)
-
     app.select_vacancy_button = tk.Button(select_frame, text="Выбрать", command=lambda: on_vacancy_select(app))
     app.select_vacancy_button.pack(side=tk.LEFT, padx=5)
-
     app.selected_vacancy_label = tk.Label(select_frame, text="Выбрана вакансия: Нет")
     app.selected_vacancy_label.pack(side=tk.LEFT, padx=5)
 
+    # Поиск вакансий
     search_vacancies_frame = tk.Frame(frame)
     search_vacancies_frame.pack(pady=5)
-
     tk.Label(search_vacancies_frame, text="Поисковый запрос:").pack(side=tk.LEFT, padx=5)
     app.search_query_entry = tk.Entry(search_vacancies_frame, width=60)
     app.search_query_entry.pack(side=tk.LEFT, padx=5)
@@ -56,6 +64,7 @@ def create_vacancies_tab(frame, app):
     load_vacancies_table(app)
 
 async def search_vacancies(app):
+    """Асинхронный поиск и сбор вакансий с hh.ru."""
     query = app.search_query_entry.get().strip()
     if not query:
         app.show_error("Введите поисковый запрос!")
@@ -80,17 +89,19 @@ async def search_vacancies(app):
         logging.error(f"Ошибка сбора вакансий '{query}': {e}")
 
 def on_vacancy_select(app):
+    """Обработчик выбора вакансии из таблицы."""
     selected_item = app.vacancies_table.selection()
     if not selected_item:
         app.show_error("Выберите вакансию!")
         return
 
-    values = app.vacancies_table.item(selected_item[0])['values']
+    values = app.vacancies_table.item(selected_item[0])["values"]
     app.selected_vacancy_id = values[0]
     app.selected_vacancy_label.config(text=f"Выбрана вакансия: {values[1]}")
     logging.info(f"Выбрана вакансия: {values[1]}, ID: {values[0]}")
 
 def load_vacancies_table(app):
+    """Загрузка данных в таблицу вакансий."""
     try:
         vacancies = app.logic.db.fetch_vacancies()
         app.vacancies_table.delete(*app.vacancies_table.get_children())
@@ -100,6 +111,7 @@ def load_vacancies_table(app):
         logging.error(f"Ошибка загрузки вакансий: {e}")
 
 def edit_vacancy_window(app, selected_item, action):
+    """Создание окна редактирования вакансии."""
     if action == "edit" and not selected_item:
         logging.error("Выберите вакансию для редактирования!")
         return
@@ -123,18 +135,19 @@ def edit_vacancy_window(app, selected_item, action):
     tk.Label(window, text="Файл вакансий:").pack(pady=5)
     file_entry = tk.Entry(window)
     file_entry.pack(pady=5)
-    tk.Button(window, text="Выбрать файл", command=lambda: [file_entry.delete(0, tk.END), file_entry.insert(tk.END, os.path.basename(filedialog.askopenfilename()))]).pack(pady=5)
+    tk.Button(window, text="Выбрать файл", command=lambda: file_entry.delete(0, tk.END) or file_entry.insert(tk.END, os.path.basename(filedialog.askopenfilename()))).pack(pady=5)
 
     if action == "edit":
-        values = app.vacancies_table.item(selected_item[0])['values']
+        values = app.vacancies_table.item(selected_item[0])["values"]
         name_entry.insert(0, values[1])
         quantity_entry.insert(0, values[2])
         date_entry.insert(0, values[3])
         file_entry.insert(0, values[4])
 
     tk.Button(window, text="Сохранить", command=lambda: save_vacancy(app, window, name_entry.get(), quantity_entry.get(), date_entry.get(), file_entry.get(), action, selected_item)).pack(pady=10)
-    
+
 def save_vacancy(app, window, name, quantity, date, file_path, action, selected_item=None):
+    """Сохранение данных вакансии в базе данных."""
     try:
         if not all([name, quantity, date, file_path]):
             logging.error("Все поля должны быть заполнены!")
@@ -146,7 +159,7 @@ def save_vacancy(app, window, name, quantity, date, file_path, action, selected_
                 load_vacancies_table(app)
                 logging.info(f"Вакансия '{name}' добавлена!")
         elif action == "edit" and selected_item:
-            values = app.vacancies_table.item(selected_item[0])['values']
+            values = app.vacancies_table.item(selected_item[0])["values"]
             if app.logic.db.update_vacancy(values[0], name, quantity, date, file_path):
                 load_vacancies_table(app)
                 logging.info(f"Вакансия '{name}' обновлена!")
@@ -159,12 +172,13 @@ def save_vacancy(app, window, name, quantity, date, file_path, action, selected_
         app.show_error("Ошибка сохранения!")
 
 def delete_vacancy(app):
+    """Удаление вакансии из базы данных."""
     selected_item = app.vacancies_table.selection()
     if not selected_item:
         logging.error("Выберите вакансию для удаления!")
         return
 
-    values = app.vacancies_table.item(selected_item[0])['values']
+    values = app.vacancies_table.item(selected_item[0])["values"]
     try:
         if app.logic.db.delete_vacancy(values[0]):
             load_vacancies_table(app)

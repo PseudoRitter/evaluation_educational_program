@@ -8,7 +8,10 @@ import os
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 class TextPreprocessor:
+    """Класс для предварительной обработки текста и классификации предложений."""
+
     def __init__(self, model_path="C:/python-models/fine_tuned_model_v4"):
+        """Инициализация с указанием пути к модели."""
         self.model_path = os.path.normpath(model_path)
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"Директория {self.model_path} не существует.")
@@ -18,7 +21,7 @@ class TextPreprocessor:
         logging.info(f"TextPreprocessor инициализирован для устройства: {self.device}")
 
     def initialize_model(self):
-        """Публичный метод для явной инициализации модели и токенизатора."""
+        """Явная инициализация модели и токенизатора."""
         self._load_model()
 
     def _load_model(self):
@@ -34,32 +37,38 @@ class TextPreprocessor:
                 raise ValueError(f"Не удалось загрузить модель из {self.model_path}")
 
     def remove_html_tags(self, text):
-        banned_words = ['"', "</strong>", "<strong>", "</p>", "<p>", "</em>", "<em>", "</ol>", "<ol>",
-                        "</div>", "<div>", "</h1>", "<h1>", "</h2>", "<h2>", "</ul>", "<ul>", "<b>", "</b>", "✅",
-                        "</h3>", "<h3>", "<li>"]
+        """Удаление HTML-тегов из текста."""
+        banned_words = [
+            '"', "</strong>", "<strong>", "</p>", "<p>", "</em>", "<em>", "</ol>", "<ol>",
+            "</div>", "<div>", "</h1>", "<h1>", "</h2>", "<h2>", "</ul>", "<ul>", "<b>",
+            "</b>", "✅", "</h3>", "<h3>", "<li>"
+        ]
         clean_text = text
         for word in banned_words:
-            clean_text = clean_text.replace(word, ' ')
+            clean_text = clean_text.replace(word, " ")
         return clean_text.strip()
 
     def remove_list_tags(self, text):
+        """Удаление тегов списков и перенос строк."""
         try:
-            return text.replace('</li>', '\n').replace('<br />', '\n')
+            return text.replace("</li>", "\n").replace("<br />", "\n")
         except Exception as e:
             logging.error(f"Ошибка удаления тегов: {e}", exc_info=True)
             return text
 
     def normalize_spaces(self, text):
+        """Нормализация пробелов в тексте."""
         try:
             if not isinstance(text, str):
                 logging.warning(f"Неверный тип данных: {type(text)}")
                 return ""
-            return ' '.join(text.split())
+            return " ".join(text.split())
         except Exception as e:
             logging.error(f"Ошибка нормализации: {e}", exc_info=True)
             return ""
 
     def segment_text(self, text):
+        """Сегментация текста на предложения."""
         try:
             return [s.text.strip() for s in sentenize(text) if s.text.strip()]
         except Exception as e:
@@ -67,6 +76,7 @@ class TextPreprocessor:
             return []
 
     def filter_short_sentences(self, sentences, min_words=3):
+        """Фильтрация коротких предложений."""
         try:
             return [s for s in sentences if s.strip() and len(s.split()) >= min_words]
         except Exception as e:
@@ -74,14 +84,16 @@ class TextPreprocessor:
             return []
 
     def filter_sentences(self, sentences):
+        """Ограничение длины предложений до 512 символов."""
         return [s[:512] for s in sentences]
 
     def classify_sentences(self, sentences, batch_size=64, exclude_category_label=1):
+        """Классификация предложений с фильтрацией."""
         try:
             if not sentences:
                 return [], []
 
-            self._load_model()  # Убедимся, что модель загружена
+            self._load_model()
             results = []
             filtered_sentences = []
             for i in range(0, len(sentences), batch_size):
@@ -94,20 +106,21 @@ class TextPreprocessor:
                         filtered_sentences.append(sentence)
                 if self.device == "cuda":
                     torch.cuda.empty_cache()
+
             return results, filtered_sentences
         except Exception as e:
             logging.error(f"Ошибка классификации: {e}", exc_info=True)
             return [], []
         finally:
-            # Очистка кэша GPU после классификации
             if self.device == "cuda":
                 logging.info("Очистка кэша GPU после классификации...")
-                self.model.to("cpu")  # Перемещаем модель на CPU
-                del self.model       # Удаляем модель из памяти
-                gc.collect()         # Вызываем сборщик мусора
-                torch.cuda.empty_cache()  # Очищаем кэш GPU
+                self.model.to("cpu")
+                del self.model
+                gc.collect()
+                torch.cuda.empty_cache()
 
     def _encode_batch(self, batch):
+        """Кодирование пакета предложений в эмбеддинги."""
         try:
             inputs = self.tokenizer(batch, padding=True, truncation=True, return_tensors="pt", max_length=128).to(self.device)
             with torch.no_grad():
@@ -116,4 +129,3 @@ class TextPreprocessor:
         except Exception as e:
             logging.error(f"Ошибка кодирования пакета: {e}", exc_info=True)
             return np.array([])
-

@@ -4,18 +4,21 @@ import logging
 import gc
 
 class SkillMatcher:
+    """Класс для сопоставления навыков программы с описаниями вакансий."""
+
     def __init__(self, device="cpu", model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2"):
+        """Инициализация с указанием устройства и модели."""
         self.device = device
         self.model_name = model_name
         self.model = None  # Ленивая загрузка модели
         logging.info(f"SkillMatcher инициализирован для устройства: {self.device}")
 
     def initialize_model(self):
-        """Публичный метод для явной инициализации модели (для совместимости)."""
+        """Явная инициализация модели (для совместимости)."""
         self._load_model()
 
     def _load_model(self):
-        """Ленивая загрузка модели."""
+        """Ленивая загрузка модели SentenceTransformer."""
         if self.model is None:
             try:
                 self.model = SentenceTransformer(self.model_name)
@@ -26,15 +29,16 @@ class SkillMatcher:
                 raise
 
     def match_skills(self, program_skills, job_descriptions, batch_size=64):
+        """Сопоставление навыков программы с описаниями вакансий."""
         try:
             if not program_skills or not job_descriptions:
                 logging.warning("Нет данных для анализа навыков.")
                 return {"sentence_transformer": {}}
 
-            self._load_model()  # Убедимся, что модель загружена
+            self._load_model()
             job_embeddings = self._encode_in_batches(job_descriptions, batch_size)
             skill_embeddings = self._encode_in_batches(program_skills, batch_size)
-            
+
             similarity_results = {}
             for i in range(0, len(program_skills), batch_size):
                 batch_skills = program_skills[i:i + batch_size]
@@ -51,6 +55,7 @@ class SkillMatcher:
             self._cleanup_memory()
 
     def _encode_in_batches(self, texts, batch_size):
+        """Кодирование текстов в эмбеддинги пакетами."""
         try:
             all_embeddings = []
             for i in range(0, len(texts), batch_size):
@@ -67,6 +72,7 @@ class SkillMatcher:
             raise
 
     def _cleanup_memory(self):
+        """Очистка памяти GPU после обработки."""
         if self.device == "cuda":
             logging.info("Очистка кэша GPU в SkillMatcher...")
             gc.collect()

@@ -1,18 +1,21 @@
-from moduls.database import Database
 import torch
 import re
 import numpy as np
 import gc
 import logging
+import os
+import json
+from moduls.database import Database
 from moduls.export_to_excel import ExcelExporter
 from moduls.skill_matcher import SkillMatcher
 from moduls.text_preprocessor import TextPreprocessor
 from concurrent.futures import ThreadPoolExecutor
-import os
-import json
 
 class Logic:
+    """Класс для управления логикой анализа соответствия программ и вакансий."""
+
     def __init__(self):
+        """Инициализация логики с базой данных и обработчиками."""
         self.results = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.db_params = {
@@ -28,6 +31,7 @@ class Logic:
         self.executor = ThreadPoolExecutor(max_workers=4)
 
     def load_vacancies_from_db(self):
+        """Загрузка списка вакансий из базы данных."""
         try:
             vacancies = self.db.fetch_vacancies()
             return [(vacancy[0], vacancy[1]) for vacancy in vacancies]
@@ -36,6 +40,7 @@ class Logic:
             return []
 
     def load_program_from_db(self, program_id):
+        """Загрузка данных программы из базы данных."""
         try:
             program_details = self.db.fetch_program_details(program_id)
             if not program_details:
@@ -51,6 +56,7 @@ class Logic:
             return None, "", []
 
     def get_competence_types(self, competence_ids):
+        """Получение типов компетенций по их ID."""
         try:
             if not competence_ids:
                 return []
@@ -60,27 +66,33 @@ class Logic:
                 JOIN type_competence tc ON c.type_competence_id = tc.type_competence_id
                 WHERE c.competence_id IN %s;
             """
-            self.db.cursor.execute(query, (tuple(competence_ids),))
-            types = dict(self.db.cursor.fetchall())
+            conn = self.db.get_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(query, (tuple(competence_ids),))
+                types = dict(cursor.fetchall())
+            self.db.release_connection(conn)
             return [types.get(cid, "Неизвестно") for cid in competence_ids]
         except Exception as e:
             logging.error(f"Ошибка получения типов компетенций: {e}")
             return ["Неизвестно"] * len(competence_ids)
 
     def calculate_competence_group_scores(self, skills_with_types, similarity_scores):
+        """Расчёт средних оценок по группам компетенций."""
         group_scores = {}
         for (skill, ctype), score in zip(skills_with_types, similarity_scores):
             group_scores.setdefault(ctype, []).append(score)
         return {ctype: np.mean(scores) if scores else 0.0 for ctype, scores in group_scores.items()}
 
     def calculate_overall_score(self, similarity_scores):
+        """Расчёт общей оценки программы."""
         return np.mean(list(similarity_scores.values())) if similarity_scores else 0.0
 
     def load_vacancy_descriptions_field(self, full_path):
+        """Загрузка описаний вакансий из JSON-файла."""
         try:
-            with open(full_path, 'r', encoding='utf-8') as file:
+            with open(full_path, "r", encoding="utf-8") as file:
                 vacancies = json.load(file)
-                return [vacancy.get('full_description', '') for vacancy in vacancies]
+                return [vacancy.get("full_description", "") for vacancy in vacancies]
         except Exception as e:
             logging.error(f"Ошибка загрузки описаний из {full_path}: {e}")
             return []
@@ -143,7 +155,7 @@ class Logic:
 
             gui.show_info("Шаг 1: Классификация и фильтрация предложений...")
             classified_results, filtered_sentences = preprocessor.classify_sentences(
-                filtered_texts.split('\n'), batch_size=batch_size, exclude_category_label=1
+                filtered_texts.split("\n"), batch_size=batch_size, exclude_category_label=1
             )
             logging.debug(f"Классифицировано предложений: {len(classified_results)}")
             gui.update_classification_table(classified_results)
@@ -156,7 +168,7 @@ class Logic:
         
             gui.show_info("Шаг 2: Оценка соответствия компетенций...")
             matcher = SkillMatcher(device=device)
-            results = matcher.match_skills(skills, filtered_texts.split('\n'), batch_size=64)
+            results = matcher.match_skills(skills, filtered_texts.split("\n"), batch_size=64)
             if isinstance(results["sentence_transformer"], (int, float)):
                 similarity_results = {skill: (results["sentence_transformer"], ctype) for skill, ctype in zip(skills, competence_types)}
             else:
@@ -185,46 +197,27 @@ class Logic:
             return {}
         finally:
             # Очистка кэша GPU после завершения анализа
-            if hasattr(self, 'device') and self.device == "cuda":
+            if hasattr(self, "device") and self.device == "cuda":
                 logging.info("Очистка кэша GPU после завершения анализа...")
-                if 'matcher' in locals() and hasattr(matcher, 'model'):
+                if "matcher" in locals() and hasattr(matcher, "model"):
                     matcher.model.to("cpu")  # Перемещаем модель SkillMatcher на CPU
                 del preprocessor  # Удаляем объект TextPreprocessor
                 gc.collect()       # Вызываем сборщик мусора
                 torch.cuda.empty_cache()  # Очищаем кэш GPU
-            
-    def load_vacancy_descriptions_field(self, full_path):
-        """Загрузка описаний вакансий из JSON-файла."""
-        try:
-            with open(full_path, 'r', encoding='utf-8') as file:
-                vacancies = json.load(file)
-                return [vacancy.get('full_description', '') for vacancy in vacancies]
-        except FileNotFoundError as e:
-            logging.error(f"Файл не найден: {full_path} - {e}")
-            return []
-        except json.JSONDecodeError as e:
-            logging.error(f"Ошибка парсинга JSON в файле {full_path}: {e}")
-            return []
-        except Exception as e:
-            logging.error(f"Ошибка при загрузке описаний из {full_path}: {e}")
-            return []
 
     def export_results_to_excel(self, app):
+        """Экспорт результатов анализа в Excel."""
         from tkinter import messagebox
         if not self.results:
             messagebox.showerror("Ошибка", "Нет данных для экспорта!")
             return
-        
-        # Извлекаем текст из меток
+
         selected_program = app.selected_program_label.cget("text").replace("Выбрана программа: ", "")
         selected_vacancy = app.selected_vacancy_label.cget("text").replace("Выбрана вакансия: ", "")
         
-        # Передаем в ExcelExporter с явным указанием параметров
         exporter = ExcelExporter(self.results, program_name=selected_program, vacancy_name=selected_vacancy)
         exporter.export_to_excel()
 
-@staticmethod
-def validate(possible_new_value):
-    if re.match(r'^[0-9a-fA-F]*$', possible_new_value):
-        return True
-    return False
+    def validate(self, possible_new_value):
+        """Проверка ввода на соответствие шестнадцатеричному формату."""
+        return bool(re.match(r"^[0-9a-fA-F]*$", possible_new_value))

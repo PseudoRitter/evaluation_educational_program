@@ -1,20 +1,21 @@
 import psycopg2
 from psycopg2.pool import ThreadedConnectionPool
 import logging
+import numpy as np
 from psycopg2 import Error
 import os
 import json
 
 class Database:
+    """Класс для работы с базой данных PostgreSQL."""
+
     def __init__(self, db_params, data_dir="vacancies"):
-        """Инициализация подключения к базе данных PostgreSQL."""
+        """Инициализация подключения к базе данных с использованием пула соединений."""
         if not isinstance(db_params, dict):
-            raise ValueError("db_params должен быть словарем, а не множеством или другим типом")
+            raise ValueError("db_params должен быть словарем")
         self.db_params = db_params
         self.data_dir = data_dir
-        self.connection = None
-        self.cursor = None
-        self.pool = ThreadedConnectionPool(1, 10, **self.db_params)  # Исправлено использование ThreadedConnectionPool
+        self.pool = ThreadedConnectionPool(1, 10, **db_params)
         self.connect()
 
     def connect(self):
@@ -48,6 +49,7 @@ class Database:
             self.pool.putconn(conn)
 
     def fetch_educational_programs(self):
+        """Получение списка образовательных программ."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -64,6 +66,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_vacancies(self):
+        """Получение списка вакансий."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -80,6 +83,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_program_details(self, program_id):
+        """Получение детальной информации о программе."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -107,6 +111,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_vacancy_details(self, vacancy_id):
+        """Получение детальной информации о вакансии."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -123,6 +128,7 @@ class Database:
             self.release_connection(conn)
 
     def save_educational_program(self, name, code, university_id, year, type_program_id, competences):
+        """Сохранение новой образовательной программы."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -148,6 +154,7 @@ class Database:
             self.release_connection(conn)
 
     def save_vacancy(self, name, num, date, file_path):
+        """Сохранение новой вакансии."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -167,6 +174,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_educational_programs_with_details(self):
+        """Получение списка программ с дополнительными данными."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -190,6 +198,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_program_id_by_name_and_code(self, name, code):
+        """Получение ID программы по названию и коду."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -206,6 +215,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_universities(self):
+        """Получение списка университетов."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -222,6 +232,7 @@ class Database:
             self.release_connection(conn)
 
     def save_university(self, full_name, short_name, city):
+        """Сохранение нового университета."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -241,6 +252,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_university_id_by_details(self, full_name, short_name, city):
+        """Получение ID университета по данным."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -257,6 +269,7 @@ class Database:
             self.release_connection(conn)
 
     def update_university(self, university_id, full_name, short_name, city):
+        """Обновление данных университета."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -275,6 +288,7 @@ class Database:
             self.release_connection(conn)
 
     def delete_university(self, university_id):
+        """Удаление университета с проверкой связей."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -293,6 +307,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_educational_program_types(self):
+        """Получение списка типов образовательных программ."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -309,6 +324,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_university_by_short_name(self, short_name):
+        """Получение университета по краткому имени."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -325,6 +341,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_educational_program_type_by_name(self, type_name):
+        """Получение ID типа программы по имени."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -341,6 +358,7 @@ class Database:
             self.release_connection(conn)
 
     def update_educational_program(self, program_id, name, code, university_id, year, type_program_id):
+        """Обновление данных образовательной программы."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -361,6 +379,7 @@ class Database:
             self.release_connection(conn)
 
     def delete_educational_program(self, program_id):
+        """Удаление образовательной программы."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -376,6 +395,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_competence_types(self):
+        """Получение списка типов компетенций."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -392,6 +412,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_competence_by_name(self, competence_name):
+        """Получение компетенции по имени."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -408,6 +429,7 @@ class Database:
             self.release_connection(conn)
 
     def save_competence(self, competence_name, type_competence_id):
+        """Сохранение новой компетенции."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -427,6 +449,7 @@ class Database:
             self.release_connection(conn)
 
     def update_competence(self, competence_id, competence_name, type_competence_id):
+        """Обновление данных компетенции."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -445,6 +468,7 @@ class Database:
             self.release_connection(conn)
 
     def delete_competence(self, competence_id):
+        """Удаление компетенции с проверкой связей."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -463,6 +487,7 @@ class Database:
             self.release_connection(conn)
 
     def fetch_competences_for_program(self, program_id):
+        """Получение компетенций для программы."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -481,6 +506,7 @@ class Database:
             self.release_connection(conn)
 
     def save_competence_for_program(self, competence_id, type_competence_id, program_id):
+        """Сохранение связи компетенции с программой."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -498,6 +524,7 @@ class Database:
             self.release_connection(conn)
 
     def update_competence_for_program(self, old_competence_id, old_type_competence_id, program_id, new_competence_id, new_type_competence_id):
+        """Обновление связи компетенции с программой."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -519,6 +546,7 @@ class Database:
             self.release_connection(conn)
 
     def delete_competence_for_program(self, competence_id, type_competence_id, program_id):
+        """Удаление связи компетенции с программой."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -536,6 +564,7 @@ class Database:
             self.release_connection(conn)
 
     def update_vacancy(self, vacancy_id, name, num, date, file_path):
+        """Обновление данных вакансии."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -554,6 +583,7 @@ class Database:
             self.release_connection(conn)
 
     def delete_vacancy(self, vacancy_id):
+        """Удаление вакансии."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -564,5 +594,112 @@ class Database:
             conn.rollback()
             logging.error(f"Ошибка при удалении вакансии: {e}")
             return False
+        finally:
+            self.release_connection(conn)
+
+    def fetch_program_vacancy_history(self):
+        """Получение уникальных пар программ, вакансий и даты анализа из таблицы assessment."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT DISTINCT ep.educational_program_name, v.vacancy_name, a.assessment_date
+                    FROM public.assessment a
+                    JOIN educational_program ep ON a.educational_program_id = ep.educational_program_id
+                    JOIN vacancy v ON a.vacancy_id = v.vacancy_id
+                    ORDER BY ep.educational_program_name, v.vacancy_name, a.assessment_date;
+                """)
+                return cursor.fetchall()
+        except Error as e:
+            logging.error(f"Ошибка при получении истории программ и вакансий: {e}")
+            return []
+        finally:
+            self.release_connection(conn)
+
+    def fetch_competence_history(self, educational_program_name, vacancy_name, assessment_date):
+        """Получение данных компетенций для выбранной программы и вакансии."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT c.competence_name, tc.type_competence_full_name, a.value
+                    FROM public.assessment a
+                    JOIN educational_program ep ON a.educational_program_id = ep.educational_program_id
+                    JOIN vacancy v ON a.vacancy_id = v.vacancy_id
+                    JOIN competence c ON a.competence_id = c.competence_id
+                    JOIN type_competence tc ON a.type_competence_id = tc.type_competence_id
+                    WHERE ep.educational_program_name = %s AND v.vacancy_name = %s AND a.assessment_date = %s
+                    ORDER BY c.competence_name;
+                """, (educational_program_name, vacancy_name, assessment_date))
+                return cursor.fetchall()
+        except Error as e:
+            logging.error(f"Ошибка при получении истории компетенций: {e}")
+            return []
+        finally:
+            self.release_connection(conn)
+
+    def fetch_assessment_results(self, educational_program_name, vacancy_name, assessment_date):
+        """Получение результатов оценки для экспорта."""
+        results = {"similarity_results": {}, "group_scores": {}, "overall_score": 0.0}
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT c.competence_name, tc.type_competence_full_name, a.value
+                    FROM public.assessment a
+                    JOIN educational_program ep ON a.educational_program_id = ep.educational_program_id
+                    JOIN vacancy v ON a.vacancy_id = v.vacancy_id
+                    JOIN competence c ON a.competence_id = c.competence_id
+                    JOIN type_competence tc ON a.type_competence_id = tc.type_competence_id
+                    WHERE ep.educational_program_name = %s AND v.vacancy_name = %s AND a.assessment_date = %s
+                    ORDER BY c.competence_name;
+                """, (educational_program_name, vacancy_name, assessment_date))
+                competences = cursor.fetchall()
+
+                for competence_name, type_competence, score in competences:
+                    results["similarity_results"][competence_name] = (float(score), type_competence)
+
+                group_scores = {}
+                for _, type_competence, score in competences:
+                    group_scores.setdefault(type_competence, []).append(float(score))
+                
+                results["group_scores"] = {ctype: np.mean(scores) for ctype, scores in group_scores.items()}
+                results["overall_score"] = np.mean([score for scores in group_scores.values() for score in scores])
+
+            return results
+        except Error as e:
+            logging.error(f"Ошибка при получении результатов оценки: {e}")
+            raise
+        finally:
+            self.release_connection(conn)
+
+    def save_assessment_results(self, program_id, vacancy_id, similarity_results):
+        """Сохранение результатов анализа в таблицу assessment."""
+        from datetime import datetime  # Локальный импорт для даты
+        conn = self.get_connection()
+        try:
+            assessment_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+            with conn.cursor() as cursor:
+                for competence, (score, type_competence) in similarity_results.items():
+                    competence_data = self.fetch_competence_by_name(competence)
+                    if not competence_data:
+                        logging.error(f"Компетенция '{competence}' не найдена!")
+                        continue
+                    competence_id, _, type_competence_id = competence_data
+
+                    cursor.execute("""
+                        INSERT INTO public.assessment (
+                            competence_id, type_competence_id, educational_program_id, vacancy_id,
+                            assessment_date, value
+                        ) VALUES (%s, %s, %s, %s, %s, %s)
+                        RETURNING assessment_id;
+                    """, (competence_id, type_competence_id, program_id, vacancy_id, assessment_date, float(score)))
+                    assessment_id = cursor.fetchone()[0]
+                    logging.info(f"Сохранена оценка ID: {assessment_id} для '{competence}'")
+                conn.commit()
+        except Error as e:
+            conn.rollback()
+            logging.error(f"Ошибка при сохранении результатов оценки: {e}")
+            raise
         finally:
             self.release_connection(conn)
