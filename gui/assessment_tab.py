@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 from datetime import datetime
+from .assessment_history_tab import refresh_history_tables
 import logging
 
 def create_assessment_tab(frame, app):
@@ -83,3 +84,5 @@ def save_assessment_results(app):
     finally:
         if 'conn' in locals():
             app.logic.db.release_connection(conn)
+
+    refresh_history_tables(app)

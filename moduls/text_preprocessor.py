@@ -99,7 +99,13 @@ class TextPreprocessor:
             logging.error(f"Ошибка классификации: {e}", exc_info=True)
             return [], []
         finally:
-            self._cleanup_memory()
+            # Очистка кэша GPU после классификации
+            if self.device == "cuda":
+                logging.info("Очистка кэша GPU после классификации...")
+                self.model.to("cpu")  # Перемещаем модель на CPU
+                del self.model       # Удаляем модель из памяти
+                gc.collect()         # Вызываем сборщик мусора
+                torch.cuda.empty_cache()  # Очищаем кэш GPU
 
     def _encode_batch(self, batch):
         try:
@@ -111,8 +117,3 @@ class TextPreprocessor:
             logging.error(f"Ошибка кодирования пакета: {e}", exc_info=True)
             return np.array([])
 
-    def _cleanup_memory(self):
-        if self.device == "cuda":
-            logging.info("Очистка кэша GPU в TextPreprocessor...")
-            gc.collect()
-            torch.cuda.empty_cache()

@@ -157,7 +157,6 @@ class Logic:
             gui.show_info("Шаг 2: Оценка соответствия компетенций...")
             matcher = SkillMatcher(device=device)
             results = matcher.match_skills(skills, filtered_texts.split('\n'), batch_size=64)
-            #logging.debug(f"Результаты match_skills: {results}")
             if isinstance(results["sentence_transformer"], (int, float)):
                 similarity_results = {skill: (results["sentence_transformer"], ctype) for skill, ctype in zip(skills, competence_types)}
             else:
@@ -194,12 +193,6 @@ class Logic:
                 gc.collect()       # Вызываем сборщик мусора
                 torch.cuda.empty_cache()  # Очищаем кэш GPU
             
-    @staticmethod
-    def validate(possible_new_value):
-        if re.match(r'^[0-9a-fA-F]*$', possible_new_value):
-            return True
-        return False
-
     def load_vacancy_descriptions_field(self, full_path):
         """Загрузка описаний вакансий из JSON-файла."""
         try:
@@ -230,6 +223,8 @@ class Logic:
         exporter = ExcelExporter(self.results, program_name=selected_program, vacancy_name=selected_vacancy)
         exporter.export_to_excel()
 
-    @staticmethod
-    def validate(possible_new_value):
-        return bool(re.match(r'^[0-9a-fA-F]*$', possible_new_value))
+@staticmethod
+def validate(possible_new_value):
+    if re.match(r'^[0-9a-fA-F]*$', possible_new_value):
+        return True
+    return False

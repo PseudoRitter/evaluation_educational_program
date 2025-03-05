@@ -30,10 +30,22 @@ def load_tables(app):
         app.programs = app.logic.db.fetch_educational_programs_with_details()
     load_table(app.program_table, [(p[0], p[1], p[2] or "", p[3], p[4]) for p in app.programs])
 
+    # Восстанавливаем выбор в program_table на основе сохранённых данных
+    if hasattr(app, 'last_selected_program_data') and app.last_selected_program_data:
+        name, code = app.last_selected_program_data
+        for item in app.program_table.get_children():
+            item_values = app.program_table.item(item)['values']
+            if item_values[0] == name and item_values[1] == code:
+                app.program_table.selection_set(item)
+                app.program_table.focus(item)
+                # Вызываем обработчик выбора для обновления competence_table_add
+                on_program_table_select(app)
+                break
+
     load_table(app.competence_table_add, 
                app.logic.db.fetch_competences_for_program(app.selected_program_id) 
                if hasattr(app, 'selected_program_id') else [])
-
+    
 def load_table(table, data):
     try:
         table.delete(*table.get_children())
@@ -99,7 +111,7 @@ def create_program_section(parent_frame, app, window):
     tk.Button(button_frame, text="Редактировать", command=lambda: edit_entity_window(app, window, "program", "edit")).pack(pady=5)
     tk.Button(button_frame, text="Удалить", command=lambda: delete_entity(app, window, "program")).pack(pady=5)
 
-    tk.Button(frame, text="Выбрать программу", command=lambda: confirm_program_selection(app)).pack(pady=5)
+    #tk.Button(frame, text="Выбрать программу", command=lambda: confirm_program_selection(app)).pack(pady=5)
     app.add_window_selected_program_label = tk.Label(frame, text="Выбрана программа: Нет")
     app.add_window_selected_program_label.pack(pady=5)
 
@@ -195,6 +207,14 @@ def edit_entity_window(app, parent_window, entity_type, action):
         logging.error("Сначала выберите программу!")
         return
 
+    # Сохраняем данные выбранной строки в program_table перед открытием окна
+    selected_program = app.program_table.selection()
+    if selected_program:
+        values = app.program_table.item(selected_program[0])['values']
+        app.last_selected_program_data = (values[0], values[1])  # Сохраняем name и code
+    else:
+        app.last_selected_program_data = None
+
     window = tk.Toplevel(parent_window)
     window.title(f"{action.capitalize()} {config['title']}")
     window.geometry(config["size"])
@@ -205,10 +225,9 @@ def edit_entity_window(app, parent_window, entity_type, action):
         widget = widget_type(window) if callable(widget_type) else widget_type(window)
         widget.pack(pady=5)
         entries.append(widget)
-        
-        # Добавляем кнопку "Удаление символов" только для ScrolledText в "Компетенция"
+
         if label == "Компетенция:" and isinstance(widget, scrolledtext.ScrolledText):
-            def remove_newlines(text_widget=widget):  # Передаём widget как параметр по умолчанию
+            def remove_newlines(text_widget=widget):
                 if not isinstance(text_widget, scrolledtext.ScrolledText):
                     logging.error(f"Ожидался ScrolledText, получен {type(text_widget)}")
                     return
@@ -217,10 +236,7 @@ def edit_entity_window(app, parent_window, entity_type, action):
                 text_widget.delete("1.0", tk.END)
                 text_widget.insert("1.0", cleaned_text)
             
-            remove_button = tk.Button(window, text="Удаление символов", command=remove_newlines)
-            remove_button.pack(pady=5)
-        elif label == "Компетенция:" and not isinstance(widget, scrolledtext.ScrolledText):
-            logging.warning(f"Поле 'Компетенция' не является ScrolledText, а {type(widget)}")
+            tk.Button(window, text="Удаление символов", command=remove_newlines).pack(pady=5)
 
         if action == "edit" and isinstance(widget, ttk.Combobox):
             widget.set(config["fetch"]()[config["fields"].index((label, widget_type))])
@@ -259,7 +275,7 @@ def save_entity(app, window, parent_window, entity_type, action, entries, old_va
             from .education_tab import sync_program_tables  # Локальный импорт
             sync_program_tables(app)
         else:
-            load_tables(app)
+            load_tables(app)  # Здесь обновляются таблицы, и выбор восстанавливается
     except Exception as e:
         logging.error(f"Ошибка при сохранении {entity_type}: {e}")
 

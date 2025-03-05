@@ -4,6 +4,7 @@ import logging
 from moduls.labor_market_data import LaborMarketData
 from datetime import datetime
 import asyncio
+import os  
 from concurrent.futures import ThreadPoolExecutor
 
 def create_vacancies_tab(frame, app):
@@ -13,9 +14,9 @@ def create_vacancies_tab(frame, app):
     container_frame.pack(pady=5, padx=5, fill="both", expand=False)
 
     vacancies_frame = ttk.LabelFrame(container_frame, text="Вакансии с сайта")
-    vacancies_frame.pack(side=tk.LEFT, pady=5, padx=5, fill="both", expand=False)
+    vacancies_frame.pack(side=tk.LEFT, pady=5, padx=5, fill="both", expand=True)
 
-    app.vacancies_table = ttk.Treeview(vacancies_frame, columns=("id", "name", "quantity", "collection_date", "file"), show="headings", height=10, selectmode="browse")
+    app.vacancies_table = ttk.Treeview(vacancies_frame, columns=("id", "name", "quantity", "collection_date", "file"), show="headings", height=10)
     app.vacancies_table.heading("id", text="ID")
     app.vacancies_table.heading("name", text="Название вакансии")
     app.vacancies_table.heading("quantity", text="Количество вакансий")
@@ -48,7 +49,7 @@ def create_vacancies_tab(frame, app):
     search_vacancies_frame.pack(pady=5)
 
     tk.Label(search_vacancies_frame, text="Поисковый запрос:").pack(side=tk.LEFT, padx=5)
-    app.search_query_entry = tk.Entry(search_vacancies_frame)
+    app.search_query_entry = tk.Entry(search_vacancies_frame, width=60)
     app.search_query_entry.pack(side=tk.LEFT, padx=5)
     tk.Button(search_vacancies_frame, text="Поиск вакансий", command=lambda: app.vac_executor.submit(search_vacancies, app)).pack(side=tk.LEFT, padx=5)
 
@@ -122,7 +123,7 @@ def edit_vacancy_window(app, selected_item, action):
     tk.Label(window, text="Файл вакансий:").pack(pady=5)
     file_entry = tk.Entry(window)
     file_entry.pack(pady=5)
-    tk.Button(window, text="Выбрать файл", command=lambda: file_entry.insert(tk.END, filedialog.askopenfilename())).pack(pady=5)
+    tk.Button(window, text="Выбрать файл", command=lambda: [file_entry.delete(0, tk.END), file_entry.insert(tk.END, os.path.basename(filedialog.askopenfilename()))]).pack(pady=5)
 
     if action == "edit":
         values = app.vacancies_table.item(selected_item[0])['values']
@@ -132,7 +133,7 @@ def edit_vacancy_window(app, selected_item, action):
         file_entry.insert(0, values[4])
 
     tk.Button(window, text="Сохранить", command=lambda: save_vacancy(app, window, name_entry.get(), quantity_entry.get(), date_entry.get(), file_entry.get(), action, selected_item)).pack(pady=10)
-
+    
 def save_vacancy(app, window, name, quantity, date, file_path, action, selected_item=None):
     try:
         if not all([name, quantity, date, file_path]):
