@@ -3,11 +3,9 @@ from tkinter import ttk, filedialog
 import logging
 from moduls.labor_market_data import LaborMarketData
 from datetime import datetime
-import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor
 from moduls.table_sort import sort_treeview_column  
-
 
 def create_vacancies_tab(frame, app):
     """Создание вкладки для работы с вакансиями."""
@@ -32,10 +30,10 @@ def create_vacancies_tab(frame, app):
     app.vacancies_table.heading("collection_date", text="Дата сбора", command=lambda: sort_treeview_column(app.vacancies_table, "collection_date", False))
     app.vacancies_table.heading("file", text="Файл вакансий", command=lambda: sort_treeview_column(app.vacancies_table, "file", False))
     app.vacancies_table.column("id", width=0, stretch=False)
-    app.vacancies_table.column("name", width=200)
-    app.vacancies_table.column("quantity", width=150)
-    app.vacancies_table.column("collection_date", width=150)
-    app.vacancies_table.column("file", width=400)
+    app.vacancies_table.column("name", width=330)
+    app.vacancies_table.column("quantity", width=120)
+    app.vacancies_table.column("collection_date", width=100)
+    app.vacancies_table.column("file", width=250)
     app.vacancies_table.pack(pady=5, fill="both", expand=True)
 
     # Кнопки управления
@@ -59,34 +57,64 @@ def create_vacancies_tab(frame, app):
     tk.Label(search_vacancies_frame, text="Поисковый запрос:").pack(side=tk.LEFT, padx=5)
     app.search_query_entry = tk.Entry(search_vacancies_frame, width=60)
     app.search_query_entry.pack(side=tk.LEFT, padx=5)
-    tk.Button(search_vacancies_frame, text="Поиск вакансий", command=lambda: app.vac_executor.submit(search_vacancies, app)).pack(side=tk.LEFT, padx=5)
+    tk.Button(search_vacancies_frame, text="Поиск вакансий", command=lambda: start_search(app)).pack(side=tk.LEFT, padx=5)
 
     load_vacancies_table(app)
 
-async def search_vacancies(app):
-    """Асинхронный поиск и сбор вакансий с hh.ru."""
+def start_search(app):
+    """Запуск поиска вакансий с обновлением таблицы."""
     query = app.search_query_entry.get().strip()
     if not query:
         app.show_error("Введите поисковый запрос!")
         return
 
+    app.show_info("Поиск вакансий начат...")
+
+    def callback(future):
+        try:
+            vacancy_id = future.result() 
+            if vacancy_id:
+                app.root.after(0, lambda: load_vacancies_table(app)) 
+                app.show_info(f"Вакансии сохранены (ID: {vacancy_id})")
+            else:
+                app.show_error("Ошибка сохранения в БД!")
+        except Exception as e:
+            app.show_error(f"Ошибка сбора вакансий: {e}")
+            logging.error(f"Ошибка в callback поиска вакансий: {e}")
+
+    future = app.vac_executor.submit(search_vacancies, app)
+    future.add_done_callback(callback)
+
+def search_vacancies(app):
+    """Синхронный поиск и сбор вакансий с hh.ru."""
+    query = app.search_query_entry.get().strip()
+    if not query:
+        app.show_error("Введите поисковый запрос!")
+        return None
+
     ACCESS_TOKEN = "APPLRDK45780T0N5LTCCGEC9DU19NPGSORRJP5535R95VETEF4203PHSQI97V49C"
     hh_data = LaborMarketData(query=query, access_token=ACCESS_TOKEN)
     try:
-        await hh_data.collect_all_vacancies()
-        current_date_time = datetime.now().strftime("%Y-%m-%d %H:%M")
-        filename = f"vacancies_hh/{query} {current_date_time}.json"
-        await hh_data.save_to_json(filename)
+        hh_data.collect_all_vacancies()
+        current_date_time = datetime.now().strftime("%Y-%m-%d %H-%M")  
+        filename = f"{query} {current_date_time}.json" 
+        full_path = f"vacancies_hh/{filename}"
 
+        os.makedirs("vacancies_hh", exist_ok=True)
+        
+        hh_data.save_to_json(full_path)  
+
+        # Передаем в БД только имя файла
         vacancy_id = app.logic.db.save_vacancy(query, len(hh_data.vacancies), current_date_time, filename)
         if vacancy_id:
-            app.show_info(f"Вакансии сохранены в {filename} (ID: {vacancy_id})")
-            load_vacancies_table(app)
+            return vacancy_id  # Возвращаем ID для callback
         else:
             app.show_error("Ошибка сохранения в БД!")
+            return None
     except Exception as e:
         app.show_error(f"Ошибка сбора вакансий: {e}")
         logging.error(f"Ошибка сбора вакансий '{query}': {e}")
+        return None
 
 def on_vacancy_select(app):
     """Обработчик выбора вакансии из таблицы."""

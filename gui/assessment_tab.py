@@ -54,7 +54,7 @@ def create_assessment_tab(frame, app):
     # Кнопка сохранения результатов
     save_results_frame = tk.Frame(main_frame)
     save_results_frame.pack(pady=4, fill="x")
-    app.save_results_button = tk.Button(save_results_frame, text="Сохранить результаты", command=lambda: save_assessment_results(app))
+    app.save_results_button = tk.Button(save_results_frame, text="Сохранить результаты в историю", command=lambda: save_assessment_results(app))
     app.save_results_button.pack()
 
 def save_assessment_results(app):

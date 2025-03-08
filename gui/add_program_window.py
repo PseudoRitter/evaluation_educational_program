@@ -78,9 +78,9 @@ def create_university_section(parent_frame, app, window):
     app.university_table.heading("full_name", text="Наименование ВУЗа", command=lambda: sort_treeview_column(app.university_table, "full_name", False))
     app.university_table.heading("short_name", text="Сокращение", command=lambda: sort_treeview_column(app.university_table, "short_name", False))
     app.university_table.heading("city", text="Город", command=lambda: sort_treeview_column(app.university_table, "city", False))
-    app.university_table.column("full_name", width=300)
-    app.university_table.column("short_name", width=120)
-    app.university_table.column("city", width=120)
+    app.university_table.column("full_name", width=400)
+    app.university_table.column("short_name", width=70)
+    app.university_table.column("city", width=70)
     app.university_table.pack(pady=2, fill="both", expand=True)
 
     button_frame = tk.Frame(container)
@@ -105,12 +105,12 @@ def create_program_section(parent_frame, app, window):
     app.program_table.heading("code", text="Код ОП", command=lambda: sort_treeview_column(app.program_table, "code", False))
     app.program_table.heading("year", text="Год ОП", command=lambda: sort_treeview_column(app.program_table, "year", False))
     app.program_table.heading("university_short", text="ВУЗ", command=lambda: sort_treeview_column(app.program_table, "university_short", False))
-    app.program_table.heading("type", text="Вид образовательной программы", command=lambda: sort_treeview_column(app.program_table, "name", False))
-    app.program_table.column("name", width=210)
-    app.program_table.column("code", width=80)
-    app.program_table.column("year", width=60)
-    app.program_table.column("university_short", width=60)
-    app.program_table.column("type", width=120)
+    app.program_table.heading("type", text="Вид ОП", command=lambda: sort_treeview_column(app.program_table, "name", False))
+    app.program_table.column("name", width=280)
+    app.program_table.column("code", width=50)
+    app.program_table.column("year", width=50)
+    app.program_table.column("university_short", width=50)
+    app.program_table.column("type", width=100)
     app.program_table.pack(pady=2, fill="both", expand=True)
     app.program_table.bind("<<TreeviewSelect>>", lambda event: on_program_table_select(app))
 
@@ -120,8 +120,8 @@ def create_program_section(parent_frame, app, window):
     tk.Button(button_frame, text="Редактировать", command=lambda: edit_entity_window(app, window, "program", "edit")).pack(pady=4)
     tk.Button(button_frame, text="Удалить", command=lambda: delete_entity(app, window, "program")).pack(pady=4)
 
-    # app.add_window_selected_program_label = tk.Label(frame, text="Выбрана программа: Нет")
-    # app.add_window_selected_program_label.pack(pady=4)
+    app.add_window_selected_program_label = tk.Label(frame, text="Выбрана программа: Нет")
+    app.add_window_selected_program_label.pack(pady=4)
 
 def create_competence_section(parent_frame, app, window):
     """Создание секции для добавления компетенций."""
@@ -137,8 +137,8 @@ def create_competence_section(parent_frame, app, window):
     app.competence_table_add = ttk.Treeview(table_frame, columns=("competence", "type"), show="headings", height=14)
     app.competence_table_add.heading("competence", text="Компетенция", command=lambda: sort_treeview_column(app.competence_table_add, "competence", False))
     app.competence_table_add.heading("type", text="Вид компетенции", command=lambda: sort_treeview_column(app.competence_table_add, "type", False))
-    app.competence_table_add.column("competence", width=300)
-    app.competence_table_add.column("type", width=200)
+    app.competence_table_add.column("competence", width=430)
+    app.competence_table_add.column("type", width=70)
     app.competence_table_add.pack(pady=2, fill="both", expand=True)
 
     button_frame = tk.Frame(container)
@@ -160,8 +160,8 @@ def on_program_table_select(app):
 
     if program_id:
         app.temp_selected_program = (name, code)
-        # app.add_window_selected_program_label.config(text=f"Выбрана программа: {name}")
-        # app.selected_program_id = program_id[0]
+        app.add_window_selected_program_label.config(text=f"Выбрана программа: {name}")
+        app.selected_program_id = program_id[0]
 
         try:
             competences = app.logic.db.fetch_competences_for_program(app.selected_program_id)

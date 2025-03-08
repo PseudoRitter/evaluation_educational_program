@@ -1,9 +1,9 @@
-import aiohttp
-import asyncio
+import requests
 import json
 import time
 import logging
-from aiohttp import ClientSession
+from datetime import datetime
+
 
 class LaborMarketData:
     """Класс для сбора данных о вакансиях с hh.ru."""
@@ -17,42 +17,42 @@ class LaborMarketData:
         self.max_vacancies_per_experience = max_vacancies_per_experience
         self.temp = []
         self.headers = {"Authorization": f"Bearer {self.access_token}"}
-        self.rate_limit_delay = 1.0  # Начальная задержка для соблюдения лимитов API
+        self.rate_limit_delay = 1.0  # Задержка для соблюдения лимитов API
 
-    async def fetch_page(self, session: ClientSession, page: int, experience: str):
-        """Асинхронный запрос страницы вакансий."""
+    def fetch_page(self, page: int, experience: str):
+        """Синхронный запрос страницы вакансий."""
         params = {
             "text": self.query,
-            "area": 90,
+            "area": 113, #113 - вся Россия
             "per_page": 100,
             "page": page,
             "experience": experience
         }
         try:
-            async with session.get(self.base_url, params=params, headers=self.headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data.get("items", []), data.get("pages", 1)
-                elif response.status == 429:  # Too Many Requests
-                    logging.warning(f"Лимит запросов превышен для {experience}, страница {page}. Увеличиваем задержку.")
-                    self.rate_limit_delay += 1.0
-                    await asyncio.sleep(self.rate_limit_delay)
-                    return await self.fetch_page(session, page, experience)
-                else:
-                    logging.error(f"Ошибка {response.status} при запросе страницы {page} для {experience}")
-                    return [], 1
+            response = requests.get(self.base_url, params=params, headers=self.headers, timeout=30)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("items", []), data.get("pages", 1)
+            elif response.status_code == 429:  # Too Many Requests
+                logging.warning(f"Лимит запросов превышен для {experience}, страница {page}. Увеличиваем задержку.")
+                self.rate_limit_delay += 1.0
+                time.sleep(self.rate_limit_delay)
+                return self.fetch_page(page, experience)
+            else:
+                logging.error(f"Ошибка {response.status_code} при запросе страницы {page} для {experience}")
+                return [], 1
         except Exception as e:
             logging.error(f"Ошибка при запросе страницы {page} для {experience}: {e}")
             return [], 1
 
-    async def fetch_vacancies_by_experience(self, session: ClientSession, experience: str):
+    def fetch_vacancies_by_experience(self, experience: str):
         """Сбор вакансий для заданного уровня опыта."""
         page = 0
         max_pages = 20
         experience_vacancies = []
 
         while page < max_pages and len(experience_vacancies) < self.max_vacancies_per_experience:
-            items, total_pages = await self.fetch_page(session, page, experience)
+            items, total_pages = self.fetch_page(page, experience)
             if not items:
                 logging.info(f"Нет больше вакансий для {experience}.")
                 break
@@ -63,44 +63,44 @@ class LaborMarketData:
             if page >= total_pages:
                 logging.info(f"Все страницы собраны для {experience}.")
                 break
-            await asyncio.sleep(self.rate_limit_delay)
+            time.sleep(self.rate_limit_delay)
 
         return experience_vacancies[:self.max_vacancies_per_experience]
 
-    async def fetch_full_vacancy_data(self, session: ClientSession, vacancy_id: str):
-        """Асинхронный запрос полной информации о вакансии."""
+    def fetch_full_vacancy_data(self, vacancy_id: str):
+        """Синхронный запрос полной информации о вакансии."""
         url = f"{self.base_url}/{vacancy_id}"
         try:
-            async with session.get(url, headers=self.headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                if response.status == 200:
-                    return await response.json()
-                elif response.status == 404:
-                    logging.warning(f"Вакансия {vacancy_id} не найдена.")
-                    return None
-                elif response.status == 429:
-                    logging.warning(f"Лимит запросов для {vacancy_id}. Увеличиваем задержку.")
-                    self.rate_limit_delay += 1.0
-                    await asyncio.sleep(self.rate_limit_delay)
-                    return await self.fetch_full_vacancy_data(session, vacancy_id)
-                else:
-                    logging.error(f"Ошибка {response.status} для вакансии {vacancy_id}")
-                    return None
+            response = requests.get(url, headers=self.headers, timeout=30)
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 404:
+                logging.warning(f"Вакансия {vacancy_id} не найдена.")
+                return None
+            elif response.status_code == 429:
+                logging.warning(f"Лимит запросов для {vacancy_id}. Увеличиваем задержку.")
+                self.rate_limit_delay += 1.0
+                time.sleep(self.rate_limit_delay)
+                return self.fetch_full_vacancy_data(vacancy_id)
+            else:
+                logging.error(f"Ошибка {response.status_code} для вакансии {vacancy_id}")
+                return None
         except Exception as e:
             logging.error(f"Ошибка при запросе вакансии {vacancy_id}: {e}")
             return None
 
-    async def collect_all_vacancies(self):
-        """Асинхронный сбор всех вакансий по уровням опыта."""
-        experience_levels = ["noExperience", "between1And3", "between3And6", "moreThan6"]
-        async with aiohttp.ClientSession() as session:
-            tasks = [self.fetch_vacancies_by_experience(session, exp) for exp in experience_levels]
-            results = await asyncio.gather(*tasks)
-            self.vacancies = [vacancy for sublist in results for vacancy in sublist]
-            logging.info(f"Собрано всего {len(self.vacancies)} вакансий")
+    def collect_all_vacancies(self):
+        """Синхронный сбор всех вакансий по уровням опыта."""
+        #experience_levels = ["noExperience", "between1And3", "between3And6", "moreThan6"]
+        experience_levels = ["noExperience", "between1And3"]
+        for exp in experience_levels:
+            vacancies = self.fetch_vacancies_by_experience(exp)
+            self.vacancies.extend(vacancies)
+        logging.info(f"Собрано всего {len(self.vacancies)} вакансий")
 
-    async def process_vacancy(self, session: ClientSession, vacancy, index, total):
+    def process_vacancy(self, vacancy, index, total):
         """Обработка одной вакансии с сохранением полной информации."""
-        full_data = await self.fetch_full_vacancy_data(session, vacancy["id"])
+        full_data = self.fetch_full_vacancy_data(vacancy["id"])
         if full_data:
             processed_vacancy = {
                 "id": vacancy["id"],
@@ -121,46 +121,43 @@ class LaborMarketData:
             return processed_vacancy
         return None
 
-    async def save_to_json(self, filename: str):
-        """Асинхронное сохранение вакансий в JSON с промежуточным сохранением."""
+    def save_to_json(self, filename: str):
+        """Синхронное сохранение вакансий в JSON с промежуточным сохранением."""
         vacancies_to_save = []
         total_vacancies = len(self.vacancies)
         skipped_vacancies = 0
 
-        async with aiohttp.ClientSession() as session:
-            tasks = [self.process_vacancy(session, vacancy, i, total_vacancies) for i, vacancy in enumerate(self.vacancies)]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+        for i, vacancy in enumerate(self.vacancies):
+            result = self.process_vacancy(vacancy, i, total_vacancies)
+            if result:
+                vacancies_to_save.append(result)
+                self.temp.append(result)
+            else:
+                skipped_vacancies += 1
+                logging.error(f"Пропущена вакансия {i + 1}/{total_vacancies}")
 
-            for result in results:
-                if isinstance(result, Exception):
-                    skipped_vacancies += 1
-                    logging.error(f"Ошибка обработки вакансии: {result}")
-                elif result:
-                    vacancies_to_save.append(result)
-                    self.temp.append(result)
-
-                if len(self.temp) % 50 == 0 or len(self.temp) == total_vacancies - skipped_vacancies:
-                    await self.save_temp_to_json("temp_vacancies.json")
+            if len(self.temp) % 50 == 0 or len(self.temp) == total_vacancies - skipped_vacancies:
+                self.save_temp_to_json("temp_vacancies.json")
 
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(vacancies_to_save, f, ensure_ascii=False, indent=4)
         logging.info(f"Данные сохранены в {filename}: {len(vacancies_to_save)} вакансий, {skipped_vacancies} пропущено")
-
-    async def save_temp_to_json(self, filename: str):
-        """Асинхронное промежуточное сохранение временных данных."""
+        
+    def save_temp_to_json(self, filename: str):
+        """Синхронное промежуточное сохранение временных данных."""
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(self.temp, f, ensure_ascii=False, indent=4)
         logging.info(f"Временные данные сохранены в {filename} ({len(self.temp)} вакансий)")
 
-    def run(self):
-        """Запуск асинхронных операций сбора и сохранения вакансий."""
-        asyncio.run(self.collect_all_vacancies())
-        asyncio.run(self.save_to_json(f"vacancies_hh/{self.query}_{time.strftime('%Y-%m-%d_%H-%M')}.json"))
+#     def run(self):
+#         """Запуск синхронных операций сбора и сохранения вакансий."""
+#         self.collect_all_vacancies()
+#         self.save_to_json(f"vacancies_hh/{self.query} {datetime.now().strftime("%Y-%m-%d %H-%M")}.json")
 
-if __name__ == "__main__":
-    ACCESS_TOKEN = "APPLRDK45780T0N5LTCCGEC9DU19NPGSORRJP5535R95VETEF4203PHSQI97V49C"
-    hh_data = LaborMarketData(query="системный аналитик", access_token=ACCESS_TOKEN)
-    try:
-        hh_data.run()
-    except Exception as e:
-        logging.error(f"Процесс прерван: {e}. Временные данные сохранены в temp_vacancies.json")
+# if __name__ == "__main__":
+#     ACCESS_TOKEN = "APPLRDK45780T0N5LTCCGEC9DU19NPGSORRJP5535R95VETEF4203PHSQI97V49C"
+#     hh_data = LaborMarketData(query="Информатик", access_token=ACCESS_TOKEN)
+#     try:
+#         hh_data.run()
+#     except Exception as e:
+#         logging.error(f"Процесс прерван: {e}. Временные данные сохранены в temp_vacancies.json")

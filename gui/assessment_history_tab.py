@@ -55,11 +55,13 @@ def create_rating_history_tab(frame, app):
     app.group_scores_history_frame = scrolledtext.ScrolledText(group_scores_frame, width=120, height=8)
     app.group_scores_history_frame.pack(pady=4)
 
-    # Кнопка экспорта
+    # Кнопка экспорта и удаления
     export_frame = tk.Frame(main_frame)
     export_frame.pack(pady=4, fill="both", expand=False)
     app.export_history_button = tk.Button(export_frame, text="Экспорт в Excel", command=lambda: export_history_to_excel(app))
-    app.export_history_button.pack()
+    app.export_history_button.pack(side=tk.LEFT, padx=5)  # Сдвигаем влево
+    app.delete_history_button = tk.Button(export_frame, text="Удалить", command=lambda: delete_assessment_table(app))
+    app.delete_history_button.pack(side=tk.LEFT, padx=5)  # Добавляем кнопку "Удалить" справа
 
     load_program_vacancy_history_table(app)
 
@@ -159,3 +161,25 @@ def refresh_history_tables(app):
     if selected_item:
         update_competence_history_table(app)
         update_group_scores(app)
+
+def delete_assessment_table(app):
+    """Удаление выбранной записи из таблицы assessment."""
+    selected_item = app.program_vacancy_history_table.selection()
+    if not selected_item:
+        messagebox.showerror("Ошибка", "Выберите запись для удаления!")
+        return
+
+    values = app.program_vacancy_history_table.item(selected_item[0])["values"]
+    educational_program_name, vacancy_name, assessment_date = values
+
+    try:
+        # Предполагается, что в Logic есть метод delete_assessment
+        if app.logic.db.delete_assessment(educational_program_name, vacancy_name, assessment_date):
+            load_program_vacancy_history_table(app)  # Обновляем таблицу после удаления
+            app.group_scores_history_frame.delete(1.0, tk.END)  # Очищаем оценки
+            logging.info(f"Запись '{educational_program_name} - {vacancy_name} - {assessment_date}' удалена из assessment")
+        else:
+            messagebox.showerror("Ошибка", "Не удалось удалить запись!")
+    except Exception as e:
+        messagebox.showerror("Ошибка", f"Ошибка удаления: {e}")
+        logging.error(f"Ошибка удаления записи из assessment: {e}", exc_info=True)

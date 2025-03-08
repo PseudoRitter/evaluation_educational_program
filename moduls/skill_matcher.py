@@ -4,26 +4,21 @@ import logging
 import gc
 
 class SkillMatcher:
-    """Класс для сопоставления навыков программы с описаниями вакансий."""
-
-    def __init__(self, device="cpu", model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2"):
-        """Инициализация с указанием устройства и модели."""
+    def __init__(self, device="cpu", model_path="C:/python-models/tuned_model_mpnet_v1"): #sentence-transformers/paraphrase-multilingual-mpnet-base-v2 #### C:/python-models/tuned_model_mpnet_v1
         self.device = device
-        self.model_name = model_name
-        self.model = None  # Ленивая загрузка модели
+        self.model_path = model_path  
+        self.model = None
         logging.info(f"SkillMatcher инициализирован для устройства: {self.device}")
 
     def initialize_model(self):
-        """Явная инициализация модели (для совместимости)."""
         self._load_model()
 
     def _load_model(self):
-        """Ленивая загрузка модели SentenceTransformer."""
         if self.model is None:
             try:
-                self.model = SentenceTransformer(self.model_name)
+                self.model = SentenceTransformer(self.model_path)  # Используем путь к локальной модели
                 self.model.to(self.device)
-                logging.info(f"Модель {self.model_name} загружена на {self.device}")
+                logging.info(f"Модель из {self.model_path} загружена на {self.device}")
             except Exception as e:
                 logging.error(f"Ошибка загрузки модели: {e}", exc_info=True)
                 raise

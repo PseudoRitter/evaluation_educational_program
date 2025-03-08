@@ -703,3 +703,29 @@ class Database:
             raise
         finally:
             self.release_connection(conn)
+
+    def delete_assessment(self, educational_program_name, vacancy_name, assessment_date):
+        """Удаление записи из таблицы assessment."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                query = """
+                    DELETE FROM public.assessment
+                    WHERE educational_program_id = (
+                        SELECT educational_program_id FROM public.educational_program WHERE educational_program_name = %s
+                    )
+                    AND vacancy_id = (
+                        SELECT vacancy_id FROM public.vacancy WHERE vacancy_name = %s
+                    )
+                    AND assessment_date = %s
+                """
+                cursor.execute(query, (educational_program_name, vacancy_name, assessment_date))
+                conn.commit()
+                logging.info(f"Запись успешно удалена из assessment: {educational_program_name}, {vacancy_name}, {assessment_date}")
+                return True
+        except Exception as e:
+            conn.rollback()
+            logging.error(f"Ошибка удаления из assessment: {e}", exc_info=True)
+            return False
+        finally:
+            self.release_connection(conn)
