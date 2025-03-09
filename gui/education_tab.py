@@ -171,10 +171,15 @@ def on_table_select(app):
         preview_competences(app)
 
 def get_program_id(app, values):
-    """Получение ID программы по названию и коду."""
+    """Получение ID программы по названию, коду, году и университету."""
     try:
-        name, code = values[0], values[1]
-        result = app.logic.db.fetch_program_id_by_name_and_code(name, code)
+        name, code, year, university_short = values[0], values[1], values[2], values[3]
+        university = app.logic.db.fetch_university_by_short_name(university_short)
+        if not university:
+            logging.error(f"Университет с коротким именем {university_short} не найден")
+            return None
+        university_id = university[0]
+        result = app.logic.db.fetch_program_id_by_name_and_code(name, code, year, university_id)
         return result[0] if result else None
     except Exception as e:
         logging.error(f"Ошибка получения ID программы: {e}")

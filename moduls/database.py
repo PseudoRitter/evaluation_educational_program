@@ -197,23 +197,27 @@ class Database:
         finally:
             self.release_connection(conn)
 
-    def fetch_program_id_by_name_and_code(self, name, code):
-        """Получение ID программы по названию и коду."""
+    def fetch_program_id_by_name_and_code(self, name, code, year, university_id):
+        """Получение ID программы по названию, коду, году и ID университета."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
                 cursor.execute("""
                     SELECT educational_program_id
                     FROM educational_program
-                    WHERE educational_program_name = %s AND educational_program_code = %s;
-                """, (str(name).strip(), str(code).strip()))
-                return cursor.fetchone()
+                    WHERE educational_program_name = %s 
+                    AND educational_program_code = %s 
+                    AND educational_program_year = %s 
+                    AND university_id = %s;
+                """, (str(name).strip(), str(code).strip(), str(year).strip(), university_id))
+                result = cursor.fetchone()
+                return result
         except Error as e:
             logging.error(f"Ошибка при получении ID программы: {e}")
             return None
         finally:
             self.release_connection(conn)
-
+            
     def fetch_universities(self):
         """Получение списка университетов."""
         conn = self.get_connection()

@@ -37,6 +37,7 @@ def load_tables(app):
     programs_data = [(p[0], p[1], p[2] or "", p[3], p[4]) for p in app.programs]
     load_table(app.program_table, programs_data)
 
+    # Восстановление выбора программы, если она была выбрана ранее
     if hasattr(app, "last_selected_program_data") and app.last_selected_program_data:
         name, code = app.last_selected_program_data
         for item in app.program_table.get_children():
@@ -44,8 +45,11 @@ def load_tables(app):
             if values[0] == name and values[1] == code:
                 app.program_table.selection_set(item)
                 app.program_table.focus(item)
-                on_program_table_select(app)
+                on_program_table_select(app)  # Обновляем компетенции для выбранной программы
                 break
+    else:
+        # Если выбора не было, очищаем таблицу компетенций
+        app.competence_table_add.delete(*app.competence_table_add.get_children())
 
     competences = (
         app.logic.db.fetch_competences_for_program(app.selected_program_id)
@@ -53,7 +57,7 @@ def load_tables(app):
         else []
     )
     load_table(app.competence_table_add, competences)
-
+    
 def load_table(table, data):
     """Универсальная загрузка данных в Treeview."""
     try:
@@ -152,16 +156,28 @@ def on_program_table_select(app):
     selected_item = app.program_table.selection()
     if not selected_item:
         app.competence_table_add.delete(*app.competence_table_add.get_children())
+        app.add_window_selected_program_label.config(text="Выбрана программа: Нет")
+        app.last_selected_program_data = None  # Сбрасываем при отсутствии выбора
         return
 
     values = app.program_table.item(selected_item[0])["values"]
-    name, code = values[0], values[1]
-    program_id = app.logic.db.fetch_program_id_by_name_and_code(name, code)
+    name, code, year, university_short = values[0], values[1], values[2], values[3]
+    university = app.logic.db.fetch_university_by_short_name(university_short)
+    if not university:
+        logging.error(f"Университет с коротким именем {university_short} не найден")
+        app.competence_table_add.delete(*app.competence_table_add.get_children())
+        app.add_window_selected_program_label.config(text="Выбрана программа: Нет")
+        app.last_selected_program_data = None
+        return
+
+    university_id = university[0]
+    program_id = app.logic.db.fetch_program_id_by_name_and_code(name, code, year, university_id)
 
     if program_id:
         app.temp_selected_program = (name, code)
         app.add_window_selected_program_label.config(text=f"Выбрана программа: {name}")
         app.selected_program_id = program_id[0]
+        app.last_selected_program_data = (name, code)  # Сохраняем данные выбранной программы
 
         try:
             competences = app.logic.db.fetch_competences_for_program(app.selected_program_id)
@@ -171,9 +187,12 @@ def on_program_table_select(app):
             logging.info(f"Компетенции для программы '{name}' (ID: {program_id[0]}) загружены")
         except Exception as e:
             logging.error(f"Ошибка загрузки компетенций: {e}")
+            app.competence_table_add.delete(*app.competence_table_add.get_children())
     else:
-        logging.error(f"Не удалось найти ID для программы: {name}, код: {code}")
+        logging.error(f"Не удалось найти ID для программы: {name}, код: {code}, год: {year}, университет: {university_short}")
         app.competence_table_add.delete(*app.competence_table_add.get_children())
+        app.add_window_selected_program_label.config(text="Выбрана программа: Нет")
+        app.last_selected_program_data = None
 
 def edit_entity_window(app, parent_window, entity_type, action):
     """Создание окна редактирования сущности (ВУЗ, программа, компетенция)."""
@@ -313,10 +332,21 @@ def save_program(app, values, old_values, action):
             app.programs = app.logic.db.fetch_educational_programs_with_details()
             logging.info(f"Программа '{name}' добавлена!")
     else:
-        program_id = app.logic.db.fetch_program_id_by_name_and_code(old_values[0], old_values[1])[0]
-        if app.logic.db.update_educational_program(program_id, name, code, university_id, year, type_program_id):
-            app.programs = app.logic.db.fetch_educational_programs_with_details()
-            logging.info(f"Программа '{name}' обновлена!")
+        try:
+            old_name, old_code, old_year, old_university_short = old_values[0], old_values[1], old_values[2], old_values[3]
+            old_university = app.logic.db.fetch_university_by_short_name(old_university_short)
+            if not old_university:
+                logging.error(f"Старый университет с коротким именем {old_university_short} не найден")
+                return
+            old_university_id = old_university[0]
+            program_id = app.logic.db.fetch_program_id_by_name_and_code(old_name, old_code, old_year, old_university_id)
+            if program_id and app.logic.db.update_educational_program(program_id[0], name, code, university_id, year, type_program_id):
+                app.programs = app.logic.db.fetch_educational_programs_with_details()
+                logging.info(f"Программа '{name}' обновлена!")
+            else:
+                logging.error(f"Не удалось найти программу для обновления: {old_name}, код: {old_code}, год: {old_year}")
+        except Exception as e:
+            logging.error(f"Ошибка обновления программы: {e}")
 
 def save_competence(app, values, old_values, action):
     """Сохранение данных компетенции."""
@@ -361,10 +391,18 @@ def delete_entity(app, parent_window, entity_type):
                 app.universities = app.logic.db.fetch_universities()
                 logging.info(f"ВУЗ '{values[0]}' удалён!")
         elif entity_type == "program":
-            program_id = app.logic.db.fetch_program_id_by_name_and_code(values[0], values[1])[0]
-            if app.logic.db.delete_educational_program(program_id):
+            name, code, year, university_short = values[0], values[1], values[2], values[3]
+            university = app.logic.db.fetch_university_by_short_name(university_short)
+            if not university:
+                logging.error(f"Университет с коротким именем {university_short} не найден")
+                return
+            university_id = university[0]
+            program_id = app.logic.db.fetch_program_id_by_name_and_code(name, code, year, university_id)
+            if program_id and app.logic.db.delete_educational_program(program_id[0]):
                 app.programs = app.logic.db.fetch_educational_programs_with_details()
-                logging.info(f"Программа '{values[0]}' удалена!")
+                logging.info(f"Программа '{name}' удалена!")
+            else:
+                logging.error(f"Не удалось найти программу для удаления: {name}, код: {code}, год: {year}")
         elif entity_type == "competence":
             if not hasattr(app, "selected_program_id"):
                 logging.error("Сначала выберите программу!")
