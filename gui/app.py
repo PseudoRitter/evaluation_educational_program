@@ -8,6 +8,7 @@ from .vacancies_tab import create_vacancies_tab
 from .debug_tab import create_debug_tab
 from .assessment_tab import create_assessment_tab
 from .assessment_history_tab import create_rating_history_tab
+from .graph_tab import create_graph_tab
 
 class App:
     """Основной класс приложения для оценки соответствия образовательных программ."""
@@ -23,6 +24,7 @@ class App:
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.create_widgets()
         self.load_initial_data()
+        
 
     def create_widgets(self):
         """Создание вкладок интерфейса."""
@@ -48,6 +50,10 @@ class App:
         self.rating_history_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.rating_history_tab, text="История оценок")
         create_rating_history_tab(self.rating_history_tab, self)
+
+        self.graph_tab = ttk.Frame(self.notebook)  # Новая вкладка
+        self.notebook.add(self.graph_tab, text="Графики")
+        create_graph_tab(self.graph_tab, self)
 
         self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
 

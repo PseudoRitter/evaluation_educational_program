@@ -38,11 +38,9 @@ class TextPreprocessor:
 
     def remove_html_tags(self, text):
         """Удаление HTML-тегов из текста."""
-        banned_words = [
-            '"', "</strong>", "<strong>", "</p>", "<p>", "</em>", "<em>", "</ol>", "<ol>",
+        banned_words = ["</strong>", "<strong>", "</p>", "<p>", "</em>", "<em>", "</ol>", "<ol>",
             "</div>", "<div>", "</h1>", "<h1>", "</h2>", "<h2>", "</ul>", "<ul>", "<b>",
-            "</b>", "✅", "</h3>", "<h3>", "<li>"
-        ]
+            "</b>", "✅", "</h3>", "<h3>", "<li>", "&quot;"]
         clean_text = text
         for word in banned_words:
             clean_text = clean_text.replace(word, " ")

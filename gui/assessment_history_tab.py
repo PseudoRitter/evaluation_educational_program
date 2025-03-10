@@ -4,6 +4,8 @@ from tkinter import ttk, scrolledtext, messagebox
 import logging
 from moduls.export_to_excel import ExcelExporter
 from moduls.table_sort import sort_treeview_column  
+from gui.graph_tab import load_graph_program_table  # Импортируем функцию из graph_tab
+
 
 def create_rating_history_tab(frame, app):
     """Создание вкладки истории оценок."""
@@ -16,14 +18,18 @@ def create_rating_history_tab(frame, app):
 
     app.program_vacancy_history_table = ttk.Treeview(
         program_vacancy_frame,
-        columns=("educational_program", "vacancy", "assessment_date"),
+        columns=("educational_program", "university", "year", "vacancy", "assessment_date"),
         show="headings",
         height=6
     )
     app.program_vacancy_history_table.heading("educational_program", text="Образовательная программа", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "educational_program", False))
+    app.program_vacancy_history_table.heading("university", text="ВУЗ", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "university", False))
+    app.program_vacancy_history_table.heading("year", text="Год", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "year", False))
     app.program_vacancy_history_table.heading("vacancy", text="Вакансия", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "vacancy", False))
     app.program_vacancy_history_table.heading("assessment_date", text="Дата и время анализа", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "assessment_date", False))
-    app.program_vacancy_history_table.column("educational_program", width=350)
+    app.program_vacancy_history_table.column("educational_program", width=300)
+    app.program_vacancy_history_table.column("university", width=80)
+    app.program_vacancy_history_table.column("year", width=80)
     app.program_vacancy_history_table.column("vacancy", width=250)
     app.program_vacancy_history_table.column("assessment_date", width=150)
     app.program_vacancy_history_table.pack(fill="both", expand=True)
@@ -59,9 +65,9 @@ def create_rating_history_tab(frame, app):
     export_frame = tk.Frame(main_frame)
     export_frame.pack(pady=4, fill="both", expand=False)
     app.export_history_button = tk.Button(export_frame, text="Экспорт в Excel", command=lambda: export_history_to_excel(app))
-    app.export_history_button.pack(side=tk.LEFT, padx=5)  # Сдвигаем влево
+    app.export_history_button.pack(side=tk.LEFT, padx=5)
     app.delete_history_button = tk.Button(export_frame, text="Удалить", command=lambda: delete_assessment_table(app))
-    app.delete_history_button.pack(side=tk.LEFT, padx=5)  # Добавляем кнопку "Удалить" справа
+    app.delete_history_button.pack(side=tk.LEFT, padx=5)
 
     load_program_vacancy_history_table(app)
 
@@ -69,19 +75,28 @@ def export_history_to_excel(app):
     """Экспорт данных из таблиц истории в Excel."""
     selected_item = app.program_vacancy_history_table.selection()
     if not selected_item:
-        messagebox.showerror("Ошибка", "Выберите запись для экспорта!")
+        logging.error("Ошибка: Выберите запись для экспорта!")
         return
 
     values = app.program_vacancy_history_table.item(selected_item[0])["values"]
-    educational_program_name, vacancy_name, assessment_date = values
+    educational_program_name, university_short, year, vacancy_name, assessment_date = values
 
     try:
         results = app.logic.db.fetch_assessment_results(educational_program_name, vacancy_name, assessment_date)
-        exporter = ExcelExporter(results, educational_program_name, vacancy_name)
-        exporter.export_to_excel()
+        exporter = ExcelExporter(
+            results,
+            program_name=educational_program_name,
+            vacancy_name=vacancy_name,
+            university=university_short,
+            year=year
+        )
+        message = exporter.export_history_to_excel()  # Используем новую функцию
+        if "успешно экспортированы" in message:
+            logging.info(message)
+        else:
+            logging.error(message)
     except Exception as e:
-        messagebox.showerror("Ошибка", f"Ошибка экспорта: {e}")
-        logging.error(f"Ошибка экспорта истории: {e}", exc_info=True)
+        logging.error(f"Ошибка экспорта: {e}", exc_info=True)
 
 def load_program_vacancy_history_table(app):
     """Загрузка данных в таблицу программ и вакансий."""
@@ -90,8 +105,10 @@ def load_program_vacancy_history_table(app):
         rows = app.logic.db.fetch_program_vacancy_history()
         logging.info(f"Загружено {len(rows)} строк из таблицы assessment")
         for row in rows:
-            assessment_date_str = row[2] if row[2] else "Не указана"
-            app.program_vacancy_history_table.insert("", tk.END, values=(row[0], row[1], assessment_date_str))
+            program_name, university_short, year, vacancy_name, assessment_date = row
+            year = year if year else ""  # Обрабатываем NULL для года
+            assessment_date_str = assessment_date if assessment_date else "Не указана"
+            app.program_vacancy_history_table.insert("", tk.END, values=(program_name, university_short, year, vacancy_name, assessment_date_str))
         if app.program_vacancy_history_table.get_children():
             app.program_vacancy_history_table.selection_set(app.program_vacancy_history_table.get_children()[0])
             update_competence_history_table(app)
@@ -109,7 +126,7 @@ def update_competence_history_table(app):
         return
 
     values = app.program_vacancy_history_table.item(selected_item[0])["values"]
-    educational_program_name, vacancy_name, assessment_date = values
+    educational_program_name, _, _, vacancy_name, assessment_date = values
 
     try:
         app.competence_history_table.delete(*app.competence_history_table.get_children())
@@ -129,7 +146,7 @@ def update_group_scores(app):
         return
 
     values = app.program_vacancy_history_table.item(selected_item[0])["values"]
-    educational_program_name, vacancy_name, assessment_date = values
+    educational_program_name, _, _, vacancy_name, assessment_date = values
 
     try:
         app.group_scores_history_frame.delete(1.0, tk.END)
@@ -166,20 +183,31 @@ def delete_assessment_table(app):
     """Удаление выбранной записи из таблицы assessment."""
     selected_item = app.program_vacancy_history_table.selection()
     if not selected_item:
-        messagebox.showerror("Ошибка", "Выберите запись для удаления!")
+        logging.error("Ошибка: Выберите запись для удаления!")
         return
 
     values = app.program_vacancy_history_table.item(selected_item[0])["values"]
-    educational_program_name, vacancy_name, assessment_date = values
+    if len(values) != 5:
+        logging.error(f"Ошибка: Неверное количество значений в строке: ожидалось 5, получено {len(values)}: {values}")
+        return
+
+    # Извлекаем только нужные поля для удаления из базы данных
+    educational_program_name = values[0]  # educational_program
+    vacancy_name = values[3]            # vacancy
+    assessment_date = values[4]         # assessment_date
 
     try:
-        # Предполагается, что в Logic есть метод delete_assessment
+        logging.info(f"Попытка удалить запись: {educational_program_name}, {vacancy_name}, {assessment_date}")
         if app.logic.db.delete_assessment(educational_program_name, vacancy_name, assessment_date):
-            load_program_vacancy_history_table(app)  # Обновляем таблицу после удаления
-            app.group_scores_history_frame.delete(1.0, tk.END)  # Очищаем оценки
+            # Удаляем строку из таблицы интерфейса (все столбцы, включая university и year)
+            app.program_vacancy_history_table.delete(selected_item[0])
+            app.group_scores_history_frame.delete(1.0, tk.END)
+            app.refresh_graph_table()  # Обновляем таблицу на вкладке "Графики"
             logging.info(f"Запись '{educational_program_name} - {vacancy_name} - {assessment_date}' удалена из assessment")
+            logging.info("Успех: Запись успешно удалена!")
         else:
-            messagebox.showerror("Ошибка", "Не удалось удалить запись!")
+            logging.error("Ошибка: Не удалось удалить запись! Проверьте логи для подробностей.")
     except Exception as e:
-        messagebox.showerror("Ошибка", f"Ошибка удаления: {e}")
-        logging.error(f"Ошибка удаления записи из assessment: {e}", exc_info=True)
+        logging.error(f"Ошибка удаления: {e}")
+
+    load_graph_program_table(app)

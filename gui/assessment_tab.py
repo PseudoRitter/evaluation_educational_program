@@ -3,8 +3,8 @@ from tkinter import ttk, scrolledtext
 from datetime import datetime
 from .assessment_history_tab import refresh_history_tables
 from moduls.table_sort import sort_treeview_column  
-
 import logging
+from gui.graph_tab import load_graph_program_table  # Импортируем функцию из graph_tab
 
 def create_assessment_tab(frame, app):
     """Создание вкладки для отображения результатов анализа компетенций."""
@@ -25,7 +25,7 @@ def create_assessment_tab(frame, app):
         show="headings",
         height=13
     )
-    app.skill_results_table.heading("competence", text="Компетенция",command=lambda: sort_treeview_column(app.skill_results_table, "competence", False))
+    app.skill_results_table.heading("competence", text="Компетенция", command=lambda: sort_treeview_column(app.skill_results_table, "competence", False))
     app.skill_results_table.heading("type_competence", text="Тип компетенции", command=lambda: sort_treeview_column(app.skill_results_table, "type_competence", False))
     app.skill_results_table.heading("score", text="Оценка")
     app.skill_results_table.column("competence", width=400)
@@ -79,6 +79,12 @@ def save_assessment_results(app):
                     continue
                 competence_id, _, type_competence_id = competence_data
 
+                # Убеждаемся, что связь существует
+                if not app.logic.db.ensure_competence_program_link(competence_id, type_competence_id, app.program_id):
+                    logging.error(f"Не удалось создать связь для '{competence}'")
+                    continue
+
+                # Сохраняем результат в assessment
                 cursor.execute("""
                     INSERT INTO public.assessment (
                         competence_id, type_competence_id, educational_program_id, vacancy_id,
@@ -100,3 +106,4 @@ def save_assessment_results(app):
             app.logic.db.release_connection(conn)
 
     refresh_history_tables(app)
+    load_graph_program_table(app)

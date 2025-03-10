@@ -602,14 +602,20 @@ class Database:
             self.release_connection(conn)
 
     def fetch_program_vacancy_history(self):
-        """Получение уникальных пар программ, вакансий и даты анализа из таблицы assessment."""
+        """Получение уникальных пар программ, вакансий, даты анализа, ВУЗа и года из таблицы assessment."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                    SELECT DISTINCT ep.educational_program_name, v.vacancy_name, a.assessment_date
+                    SELECT DISTINCT 
+                        ep.educational_program_name, 
+                        u.university_short_name,
+                        ep.educational_program_year,
+                        v.vacancy_name, 
+                        a.assessment_date
                     FROM public.assessment a
                     JOIN educational_program ep ON a.educational_program_id = ep.educational_program_id
+                    JOIN university u ON ep.university_id = u.university_id
                     JOIN vacancy v ON a.vacancy_id = v.vacancy_id
                     ORDER BY ep.educational_program_name, v.vacancy_name, a.assessment_date;
                 """)
@@ -712,24 +718,122 @@ class Database:
         """Удаление записи из таблицы assessment."""
         conn = self.get_connection()
         try:
+            # Обрезаем секунды из assessment_date для соответствия формату
+            assessment_date_truncated = assessment_date[:16]  # Например, "2025-03-10 00:48:00" -> "2025-03-10 00:48"
+            logging.info(f"Обрезанная дата для удаления: {assessment_date_truncated}")
+
             with conn.cursor() as cursor:
-                query = """
-                    DELETE FROM public.assessment
-                    WHERE educational_program_id = (
-                        SELECT educational_program_id FROM public.educational_program WHERE educational_program_name = %s
-                    )
-                    AND vacancy_id = (
-                        SELECT vacancy_id FROM public.vacancy WHERE vacancy_name = %s
-                    )
-                    AND assessment_date = %s
-                """
-                cursor.execute(query, (educational_program_name, vacancy_name, assessment_date))
+                # Проверяем, существуют ли записи с заданными параметрами
+                cursor.execute("""
+                    SELECT a.assessment_id, a.assessment_date, ep.educational_program_name, v.vacancy_name
+                    FROM public.assessment a
+                    JOIN educational_program ep ON a.educational_program_id = ep.educational_program_id
+                    JOIN vacancy v ON a.vacancy_id = v.vacancy_id
+                    WHERE ep.educational_program_name = %s
+                    AND v.vacancy_name = %s
+                    AND a.assessment_date = %s  -- Прямое сравнение без LIKE
+                """, (educational_program_name, vacancy_name, assessment_date_truncated))
+                matching_records = cursor.fetchall()
+                if not matching_records:
+                    logging.warning(f"Запись не найдена для удаления: {educational_program_name}, {vacancy_name}, {assessment_date}")
+                    logging.warning(f"Проверенные данные: educational_program_name={educational_program_name}, vacancy_name={vacancy_name}, assessment_date_truncated={assessment_date_truncated}")
+                    # Дополнительный запрос для отладки
+                    cursor.execute("""
+                        SELECT a.assessment_date FROM public.assessment a
+                        JOIN educational_program ep ON a.educational_program_id = ep.educational_program_id
+                        JOIN vacancy v ON a.vacancy_id = v.vacancy_id
+                        WHERE ep.educational_program_name = %s
+                        AND v.vacancy_name = %s
+                    """, (educational_program_name, vacancy_name))
+                    existing_dates = cursor.fetchall()
+                    logging.warning(f"Существующие даты для {educational_program_name}, {vacancy_name}: {existing_dates}")
+                    return False
+                else:
+                    logging.info(f"Найдено {len(matching_records)} записей для удаления: {matching_records}")
+
+                # Выполняем удаление
+                cursor.execute("""
+                    DELETE FROM public.assessment a
+                    USING educational_program ep, vacancy v
+                    WHERE a.educational_program_id = ep.educational_program_id
+                    AND a.vacancy_id = v.vacancy_id
+                    AND ep.educational_program_name = %s
+                    AND v.vacancy_name = %s
+                    AND a.assessment_date = %s  -- Прямое сравнение без LIKE
+                """, (educational_program_name, vacancy_name, assessment_date_truncated))
+                deleted_rows = cursor.rowcount
                 conn.commit()
-                logging.info(f"Запись успешно удалена из assessment: {educational_program_name}, {vacancy_name}, {assessment_date}")
-                return True
+
+                if deleted_rows > 0:
+                    logging.info(f"Удалено {deleted_rows} строк из assessment: {educational_program_name}, {vacancy_name}, {assessment_date}")
+                    return True
+                else:
+                    logging.warning(f"Запись не удалена, хотя была найдена: {educational_program_name}, {vacancy_name}, {assessment_date}")
+                    return False
         except Exception as e:
             conn.rollback()
             logging.error(f"Ошибка удаления из assessment: {e}", exc_info=True)
             return False
+        finally:
+            self.release_connection(conn)
+
+    def ensure_competence_program_link(self, competence_id, type_competence_id, educational_program_id):
+        """Проверка и добавление связи компетенции с программой, если её нет."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT 1 FROM competence_educational_program
+                    WHERE competence_id = %s AND type_competence_id = %s AND educational_program_id = %s;
+                """, (competence_id, type_competence_id, educational_program_id))
+                if not cursor.fetchone():
+                    cursor.execute("""
+                        INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
+                        VALUES (%s, %s, %s);
+                    """, (competence_id, type_competence_id, educational_program_id))
+                    logging.info(f"Добавлена связь: competence_id={competence_id}, type_competence_id={type_competence_id}, educational_program_id={educational_program_id}")
+                conn.commit()
+                return True
+        except Error as e:
+            conn.rollback()
+            logging.error(f"Ошибка при добавлении связи в competence_educational_program: {e}")
+            return False
+        finally:
+            self.release_connection(conn)
+
+    def fetch_unique_programs_for_graphs(self):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT DISTINCT ep.educational_program_name, ep.educational_program_code,
+                        ep.educational_program_year, u.university_short_name
+                    FROM public.assessment a
+                    JOIN educational_program ep ON a.educational_program_id = ep.educational_program_id
+                    JOIN university u ON ep.university_id = u.university_id
+                    ORDER BY ep.educational_program_name;
+                """)
+                return cursor.fetchall()
+        except Exception as e:
+            logging.error(f"Ошибка при получении программ для графиков: {e}")
+            return []
+        finally:
+            self.release_connection(conn)
+
+    def fetch_program_code(self, program_name, year, univ_short_name):
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT educational_program_code
+                    FROM educational_program
+                    WHERE educational_program_name = %s AND educational_program_year = %s
+                    AND university_id = (SELECT university_id FROM university WHERE university_short_name = %s);
+                """, (program_name, year, univ_short_name))
+                result = cursor.fetchone()
+                return result[0] if result else "Неизвестно"
+        except Exception as e:
+            logging.error(f"Ошибка при получении кода программы: {e}")
+            return "Неизвестно"
         finally:
             self.release_connection(conn)
