@@ -1,4 +1,3 @@
-import re
 from razdel import sentenize
 import torch
 import numpy as np
@@ -7,11 +6,12 @@ import logging
 import os
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
+BATCH_SIZE = 64
+
 class TextPreprocessor:
     """Класс для предварительной обработки текста и классификации предложений."""
 
     def __init__(self, model_path="C:/python-models/fine_tuned_model_v4"):
-        """Инициализация с указанием пути к модели."""
         self.model_path = os.path.normpath(model_path)
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"Директория {self.model_path} не существует.")
@@ -21,11 +21,9 @@ class TextPreprocessor:
         logging.info(f"TextPreprocessor инициализирован для устройства: {self.device}")
 
     def initialize_model(self):
-        """Явная инициализация модели и токенизатора."""
         self._load_model()
 
     def _load_model(self):
-        """Ленивая загрузка модели и токенизатора."""
         if self.tokenizer is None or self.model is None:
             try:
                 self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
@@ -37,7 +35,6 @@ class TextPreprocessor:
                 raise ValueError(f"Не удалось загрузить модель из {self.model_path}")
 
     def remove_html_tags(self, text):
-        """Удаление HTML-тегов из текста."""
         banned_words = ["</strong>", "<strong>", "</p>", "<p>", "</em>", "<em>", "</ol>", "<ol>",
             "</div>", "<div>", "</h1>", "<h1>", "</h2>", "<h2>", "</ul>", "<ul>", "<b>",
             "</b>", "✅", "</h3>", "<h3>", "<li>", "&quot;"]
@@ -47,7 +44,6 @@ class TextPreprocessor:
         return clean_text.strip()
 
     def remove_list_tags(self, text):
-        """Удаление тегов списков и перенос строк."""
         try:
             return text.replace("</li>", "\n").replace("<br />", "\n")
         except Exception as e:
@@ -55,7 +51,6 @@ class TextPreprocessor:
             return text
 
     def normalize_spaces(self, text):
-        """Нормализация пробелов в тексте."""
         try:
             if not isinstance(text, str):
                 logging.warning(f"Неверный тип данных: {type(text)}")
@@ -66,7 +61,6 @@ class TextPreprocessor:
             return ""
 
     def segment_text(self, text):
-        """Сегментация текста на предложения."""
         try:
             return [s.text.strip() for s in sentenize(text) if s.text.strip()]
         except Exception as e:
@@ -74,7 +68,6 @@ class TextPreprocessor:
             return []
 
     def filter_short_sentences(self, sentences, min_words=3):
-        """Фильтрация коротких предложений."""
         try:
             return [s for s in sentences if s.strip() and len(s.split()) >= min_words]
         except Exception as e:
@@ -82,11 +75,9 @@ class TextPreprocessor:
             return []
 
     def filter_sentences(self, sentences):
-        """Ограничение длины предложений до 512 символов."""
         return [s[:512] for s in sentences]
 
-    def classify_sentences(self, sentences, batch_size=64, exclude_category_label=1):
-        """Классификация предложений с фильтрацией."""
+    def classify_sentences(self, sentences, BATCH_SIZE=64, exclude_category_label=1):
         try:
             if not sentences:
                 return [], []
@@ -94,8 +85,8 @@ class TextPreprocessor:
             self._load_model()
             results = []
             filtered_sentences = []
-            for i in range(0, len(sentences), batch_size):
-                batch = sentences[i:i + batch_size]
+            for i in range(0, len(sentences), BATCH_SIZE):
+                batch = sentences[i:i + BATCH_SIZE]
                 embeddings = self._encode_batch(batch)
                 for embedding, sentence in zip(embeddings, batch):
                     label = np.argmax(embedding)
@@ -118,7 +109,6 @@ class TextPreprocessor:
                 torch.cuda.empty_cache()
 
     def _encode_batch(self, batch):
-        """Кодирование пакета предложений в эмбеддинги."""
         try:
             inputs = self.tokenizer(batch, padding=True, truncation=True, return_tensors="pt", max_length=128).to(self.device)
             with torch.no_grad():

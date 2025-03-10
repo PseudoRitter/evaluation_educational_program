@@ -8,10 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 from moduls.table_sort import sort_treeview_column  
 
 def create_vacancies_tab(frame, app):
-    """Создание вкладки для работы с вакансиями."""
     app.vac_executor = ThreadPoolExecutor(max_workers=1)
 
-    # Контейнер для таблицы и кнопок
     container_frame = tk.Frame(frame)
     container_frame.pack(pady=5, padx=5, fill="both", expand=False)
 
@@ -36,14 +34,12 @@ def create_vacancies_tab(frame, app):
     app.vacancies_table.column("file", width=250)
     app.vacancies_table.pack(pady=5, fill="both", expand=True)
 
-    # Кнопки управления
     button_frame = tk.Frame(container_frame)
     button_frame.pack(side=tk.LEFT, padx=10, fill="y")
     tk.Button(button_frame, text="Добавить", command=lambda: edit_vacancy_window(app, None, "add")).pack(pady=5)
     tk.Button(button_frame, text="Редактировать", command=lambda: edit_vacancy_window(app, app.vacancies_table.selection(), "edit")).pack(pady=5)
     tk.Button(button_frame, text="Удалить", command=lambda: delete_vacancy(app)).pack(pady=5)
 
-    # Кнопка выбора и метка
     select_frame = tk.Frame(frame)
     select_frame.pack(pady=5)
     app.select_vacancy_button = tk.Button(select_frame, text="Выбрать", command=lambda: on_vacancy_select(app))
@@ -51,7 +47,6 @@ def create_vacancies_tab(frame, app):
     app.selected_vacancy_label = tk.Label(select_frame, text="Выбрана вакансия: Нет")
     app.selected_vacancy_label.pack(side=tk.LEFT, padx=5)
 
-    # Поиск вакансий
     search_vacancies_frame = tk.Frame(frame)
     search_vacancies_frame.pack(pady=5)
     tk.Label(search_vacancies_frame, text="Поисковый запрос:").pack(side=tk.LEFT, padx=5)
@@ -62,7 +57,6 @@ def create_vacancies_tab(frame, app):
     load_vacancies_table(app)
 
 def start_search(app):
-    """Запуск поиска вакансий с обновлением таблицы."""
     query = app.search_query_entry.get().strip()
     if not query:
         app.show_error("Введите поисковый запрос!")
@@ -86,7 +80,6 @@ def start_search(app):
     future.add_done_callback(callback)
 
 def search_vacancies(app):
-    """Синхронный поиск и сбор вакансий с hh.ru."""
     query = app.search_query_entry.get().strip()
     if not query:
         app.show_error("Введите поисковый запрос!")
@@ -104,10 +97,9 @@ def search_vacancies(app):
         
         hh_data.save_to_json(full_path)  
 
-        # Передаем в БД только имя файла
         vacancy_id = app.logic.db.save_vacancy(query, len(hh_data.vacancies), current_date_time, filename)
         if vacancy_id:
-            return vacancy_id  # Возвращаем ID для callback
+            return vacancy_id  
         else:
             app.show_error("Ошибка сохранения в БД!")
             return None
@@ -117,7 +109,6 @@ def search_vacancies(app):
         return None
 
 def on_vacancy_select(app):
-    """Обработчик выбора вакансии из таблицы."""
     selected_item = app.vacancies_table.selection()
     if not selected_item:
         app.show_error("Выберите вакансию!")
@@ -129,7 +120,6 @@ def on_vacancy_select(app):
     logging.info(f"Выбрана вакансия: {values[1]}, ID: {values[0]}")
 
 def load_vacancies_table(app):
-    """Загрузка данных в таблицу вакансий."""
     try:
         vacancies = app.logic.db.fetch_vacancies()
         app.vacancies_table.delete(*app.vacancies_table.get_children())
@@ -139,7 +129,6 @@ def load_vacancies_table(app):
         logging.error(f"Ошибка загрузки вакансий: {e}")
 
 def edit_vacancy_window(app, selected_item, action):
-    """Создание окна редактирования вакансии."""
     if action == "edit" and not selected_item:
         logging.error("Выберите вакансию для редактирования!")
         return
@@ -175,7 +164,6 @@ def edit_vacancy_window(app, selected_item, action):
     tk.Button(window, text="Сохранить", command=lambda: save_vacancy(app, window, name_entry.get(), quantity_entry.get(), date_entry.get(), file_entry.get(), action, selected_item)).pack(pady=10)
 
 def save_vacancy(app, window, name, quantity, date, file_path, action, selected_item=None):
-    """Сохранение данных вакансии в базе данных."""
     try:
         if not all([name, quantity, date, file_path]):
             logging.error("Все поля должны быть заполнены!")
@@ -200,7 +188,6 @@ def save_vacancy(app, window, name, quantity, date, file_path, action, selected_
         app.show_error("Ошибка сохранения!")
 
 def delete_vacancy(app):
-    """Удаление вакансии из базы данных."""
     selected_item = app.vacancies_table.selection()
     if not selected_item:
         logging.error("Выберите вакансию для удаления!")

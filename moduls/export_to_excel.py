@@ -3,10 +3,7 @@ from tkinter import filedialog
 from datetime import datetime
 
 class ExcelExporter:
-    """Класс для экспорта результатов анализа в Excel-файл."""
-
     def __init__(self, results, program_name=None, vacancy_name=None, university=None, year=None):
-        """Инициализация экспортера с результатами анализа."""
         self.results = results
         self.program_name = program_name
         self.vacancy_name = vacancy_name
@@ -14,17 +11,13 @@ class ExcelExporter:
         self.year = year  # Добавляем год
 
     def export_to_excel(self):
-        """Экспорт данных в Excel-файл с выбором пути пользователем."""
         if not self.results:
             return "Нет данных для экспорта! Сначала запустите анализ."
 
-        # Подготовка данных для экспорта
         data = self._prepare_data()
 
-        # Создание DataFrame
         df = pd.DataFrame(data)
 
-        # Запрос пути для сохранения файла
         filepath = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
             filetypes=[("Excel files", "*.xlsx")],
@@ -40,10 +33,8 @@ class ExcelExporter:
         return "Экспорт отменён."
 
     def _prepare_data(self):
-        """Подготовка данных для экспорта в требуемом порядке."""
         data = []
 
-        # Добавление заголовков
         if self.program_name:
             data.append({"Описание компетенции": f"Образовательная программа: {self.program_name}", "Вид компетенции": "", "Оценка": ""})
         if self.vacancy_name:
@@ -51,11 +42,9 @@ class ExcelExporter:
         creation_date = datetime.now().strftime("%Y-%m-%d %H:%M")
         data.append({"Описание компетенции": f"Дата создания: {creation_date}", "Вид компетенции": "", "Оценка": ""})
 
-        # Добавление компетенций
         for skill, (score, ctype) in self.results.get("similarity_results", {}).items():
             data.append({"Описание компетенции": skill, "Вид компетенции": ctype, "Оценка": score})
 
-        # Добавление оценок групп и общей оценки
         if "group_scores" in self.results and "overall_score" in self.results:
             for ctype, score in self.results["group_scores"].items():
                 data.append({"Описание компетенции": f"Оценка группы: {ctype}", "Вид компетенции": "", "Оценка": score})
@@ -64,17 +53,13 @@ class ExcelExporter:
         return data
 
     def export_history_to_excel(self):
-        """Экспорт данных истории оценок в Excel для вкладки 'История оценок'."""
         if not self.results:
             return "Нет данных для экспорта!"
 
-        # Подготовка данных для истории
         data = self._prepare_history_data()
 
-        # Создание DataFrame
         df = pd.DataFrame(data)
 
-        # Запрос пути для сохранения файла
         filepath = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
             filetypes=[("Excel files", "*.xlsx")],
@@ -91,10 +76,8 @@ class ExcelExporter:
         return "Экспорт отменён."
 
     def _prepare_history_data(self):
-        """Подготовка данных для экспорта истории оценок."""
         data = []
 
-        # Добавление заголовков с учётом новых полей
         if self.program_name:
             data.append({"Описание компетенции": f"Образовательная программа: {self.program_name}", "Вид компетенции": "", "Оценка": ""})
         if self.university:
@@ -106,11 +89,9 @@ class ExcelExporter:
         creation_date = datetime.now().strftime("%Y-%m-%d %H:%M")
         data.append({"Описание компетенции": f"Дата создания: {creation_date}", "Вид компетенции": "", "Оценка": ""})
 
-        # Добавление компетенций
         for skill, (score, ctype) in self.results.get("similarity_results", {}).items():
             data.append({"Описание компетенции": skill, "Вид компетенции": ctype, "Оценка": score})
 
-        # Добавление оценок групп и общей оценки
         if "group_scores" in self.results and "overall_score" in self.results:
             for ctype, score in self.results["group_scores"].items():
                 data.append({"Описание компетенции": f"Оценка группы: {ctype}", "Вид компетенции": "", "Оценка": score})

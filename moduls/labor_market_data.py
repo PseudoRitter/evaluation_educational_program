@@ -6,10 +6,7 @@ from datetime import datetime
 
 
 class LaborMarketData:
-    """Класс для сбора данных о вакансиях с hh.ru."""
-
     def __init__(self, query: str, access_token: str, max_vacancies_per_experience=2000):
-        """Инициализация объекта для сбора вакансий."""
         self.base_url = "https://api.hh.ru/vacancies"
         self.query = query
         self.access_token = access_token
@@ -20,7 +17,6 @@ class LaborMarketData:
         self.rate_limit_delay = 1.0  # Задержка для соблюдения лимитов API
 
     def fetch_page(self, page: int, experience: str):
-        """Синхронный запрос страницы вакансий."""
         params = {
             "text": self.query,
             "area": 113, #113 - вся Россия
@@ -46,7 +42,6 @@ class LaborMarketData:
             return [], 1
 
     def fetch_vacancies_by_experience(self, experience: str):
-        """Сбор вакансий для заданного уровня опыта."""
         page = 0
         max_pages = 20
         experience_vacancies = []
@@ -68,7 +63,6 @@ class LaborMarketData:
         return experience_vacancies[:self.max_vacancies_per_experience]
 
     def fetch_full_vacancy_data(self, vacancy_id: str):
-        """Синхронный запрос полной информации о вакансии."""
         url = f"{self.base_url}/{vacancy_id}"
         try:
             response = requests.get(url, headers=self.headers, timeout=30)
@@ -90,7 +84,6 @@ class LaborMarketData:
             return None
 
     def collect_all_vacancies(self):
-        """Синхронный сбор всех вакансий по уровням опыта."""
         #experience_levels = ["noExperience", "between1And3", "between3And6", "moreThan6"]
         experience_levels = ["noExperience", "between1And3"]
         for exp in experience_levels:
@@ -99,7 +92,6 @@ class LaborMarketData:
         logging.info(f"Собрано всего {len(self.vacancies)} вакансий")
 
     def process_vacancy(self, vacancy, index, total):
-        """Обработка одной вакансии с сохранением полной информации."""
         full_data = self.fetch_full_vacancy_data(vacancy["id"])
         if full_data:
             processed_vacancy = {
@@ -122,7 +114,6 @@ class LaborMarketData:
         return None
 
     def save_to_json(self, filename: str):
-        """Синхронное сохранение вакансий в JSON с промежуточным сохранением."""
         vacancies_to_save = []
         total_vacancies = len(self.vacancies)
         skipped_vacancies = 0
@@ -144,7 +135,6 @@ class LaborMarketData:
         logging.info(f"Данные сохранены в {filename}: {len(vacancies_to_save)} вакансий, {skipped_vacancies} пропущено")
         
     def save_temp_to_json(self, filename: str):
-        """Синхронное промежуточное сохранение временных данных."""
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(self.temp, f, ensure_ascii=False, indent=4)
         logging.info(f"Временные данные сохранены в {filename} ({len(self.temp)} вакансий)")

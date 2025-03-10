@@ -4,7 +4,6 @@ from gui.app import App
 from logic import Logic
 
 def configure_logging():
-    """Настройка логирования для приложения."""
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -12,9 +11,8 @@ def configure_logging():
     )
 
 def main():
-    """Запуск приложения для оценки соответствия образовательных программ."""
     configure_logging()
-    
+
     root = tk.Tk()
     logic = Logic()
     app = App(root, logic)

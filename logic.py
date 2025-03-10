@@ -11,11 +11,10 @@ from moduls.skill_matcher import SkillMatcher
 from moduls.text_preprocessor import TextPreprocessor
 from concurrent.futures import ThreadPoolExecutor
 
-class Logic:
-    """Класс для управления логикой анализа соответствия программ и вакансий."""
+BATCH_SIZE = 64
 
+class Logic:
     def __init__(self):
-        """Инициализация логики с базой данных и обработчиками."""
         self.results = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.db_params = {
@@ -31,7 +30,6 @@ class Logic:
         self.executor = ThreadPoolExecutor(max_workers=4)
 
     def load_vacancies_from_db(self):
-        """Загрузка списка вакансий из базы данных."""
         try:
             vacancies = self.db.fetch_vacancies()
             return [(vacancy[0], vacancy[1]) for vacancy in vacancies]
@@ -40,7 +38,6 @@ class Logic:
             return []
 
     def load_program_from_db(self, program_id):
-        """Загрузка данных программы из базы данных."""
         try:
             program_details = self.db.fetch_program_details(program_id)
             if not program_details:
@@ -56,7 +53,6 @@ class Logic:
             return None, "", []
 
     def get_competence_types(self, competence_ids):
-        """Получение типов компетенций по их ID."""
         try:
             if not competence_ids:
                 return []
@@ -77,18 +73,15 @@ class Logic:
             return ["Неизвестно"] * len(competence_ids)
 
     def calculate_competence_group_scores(self, skills_with_types, similarity_scores):
-        """Расчёт средних оценок по группам компетенций."""
         group_scores = {}
         for (skill, ctype), score in zip(skills_with_types, similarity_scores):
             group_scores.setdefault(ctype, []).append(score)
         return {ctype: np.mean(scores) if scores else 0.0 for ctype, scores in group_scores.items()}
 
     def calculate_overall_score(self, similarity_scores):
-        """Расчёт общей оценки программы."""
         return np.mean(list(similarity_scores.values())) if similarity_scores else 0.0
 
     def load_vacancy_descriptions_field(self, full_path):
-        """Загрузка описаний вакансий из JSON-файла."""
         try:
             with open(full_path, "r", encoding="utf-8") as file:
                 vacancies = json.load(file)
@@ -97,40 +90,37 @@ class Logic:
             logging.error(f"Ошибка загрузки описаний из {full_path}: {e}")
             return []
 
-    def run_analysis(self, program_id, vacancy_id, gui, batch_size=64):
+    def run_analysis(self, program_id, vacancy_id, gui, BATCH_SIZE):
         try:
-            # Устанавливаем имя файла из БД (эквивалент load_vacancy_description)
             vacancy = self.db.fetch_vacancy_details(vacancy_id)
             if not vacancy:
                 gui.show_error("Вакансия не найдена в базе данных!")
                 logging.error("Вакансия не найдена в базе данных.")
                 return {}
-            self.vacancy_file = vacancy[3]  # vacancy_file содержит "разработчик.json"
+            self.vacancy_file = vacancy[3] 
 
-            # Формируем полный путь к файлу
-            full_path = os.path.join(self.db.data_dir, self.vacancy_file)  # Например, "vacancies_hh/разработчик.json"
+            full_path = os.path.join(self.db.data_dir, self.vacancy_file)  
             if not os.path.exists(full_path):
                 gui.show_error(f"Файл с вакансиями не найден: {full_path}")
                 logging.error(f"Файл с вакансиями не найден: {full_path}")
                 return {}
             
             logging.debug(f"Загружаем файл: {full_path}")
-            job_descriptions = self.load_vacancy_descriptions_field(full_path)  # Используем новый метод
+            job_descriptions = self.load_vacancy_descriptions_field(full_path)  
             logging.debug(f"Загружено описаний: {len(job_descriptions)}")
             if not job_descriptions:
                 gui.show_error(f"Файл {full_path} не содержит описаний вакансий!")
                 logging.error(f"Файл {full_path} не содержит описаний вакансий!")
                 return {}
 
-            # Загружаем данные программы из БД
             title, description, skills_with_types = self.load_program_from_db(program_id)
             if not title or not description or not skills_with_types:
                 gui.show_error("Образовательная программа не найдена в базе данных!")
                 logging.error("Образовательная программа не найдена в базе данных.")
                 return {}
             
-            skills = [skill for skill, _ in skills_with_types]  # Извлекаем только названия компетенций для анализа
-            competence_types = [ctype for _, ctype in skills_with_types]  # Извлекаем типы компетенций
+            skills = [skill for skill, _ in skills_with_types]  
+            competence_types = [ctype for _, ctype in skills_with_types]  
 
             preprocessor = TextPreprocessor()
             device = preprocessor.device  
@@ -155,7 +145,7 @@ class Logic:
 
             gui.show_info("Шаг 1: Классификация и фильтрация предложений...")
             classified_results, filtered_sentences = preprocessor.classify_sentences(
-                filtered_texts.split("\n"), batch_size=batch_size, exclude_category_label=1
+                filtered_texts.split("\n"), BATCH_SIZE=BATCH_SIZE, exclude_category_label=1
             )
             logging.debug(f"Классифицировано предложений: {len(classified_results)}")
             gui.update_classification_table(classified_results)
@@ -163,12 +153,12 @@ class Logic:
 
             if device == "cuda":
                 logging.info("Кэш GPU очищен после классификации.")
-                gc.collect()  # Вызываем сборщик мусора
-                torch.cuda.empty_cache()  # Очищаем кэш GPU
+                gc.collect() 
+                torch.cuda.empty_cache()  
         
             gui.show_info("Шаг 2: Оценка соответствия компетенций...")
             matcher = SkillMatcher(device=device)
-            results = matcher.match_skills(skills, filtered_texts.split("\n"), batch_size=64)
+            results = matcher.match_skills(skills, filtered_texts.split("\n"), BATCH_SIZE)
             if isinstance(results["sentence_transformer"], (int, float)):
                 similarity_results = {skill: (results["sentence_transformer"], ctype) for skill, ctype in zip(skills, competence_types)}
             else:
@@ -196,14 +186,13 @@ class Logic:
             gui.show_error(f"Произошла ошибка: {e}")
             return {}
         finally:
-            # Очистка кэша GPU после завершения анализа
             if hasattr(self, "device") and self.device == "cuda":
                 logging.info("Очистка кэша GPU после завершения анализа...")
                 if "matcher" in locals() and hasattr(matcher, "model"):
-                    matcher.model.to("cpu")  # Перемещаем модель SkillMatcher на CPU
-                del preprocessor  # Удаляем объект TextPreprocessor
-                gc.collect()       # Вызываем сборщик мусора
-                torch.cuda.empty_cache()  # Очищаем кэш GPU
+                    matcher.model.to("cpu")  
+                del preprocessor  
+                gc.collect()       
+                torch.cuda.empty_cache()  
 
     def export_results_to_excel(self, app):
         """Экспорт результатов анализа в Excel."""
