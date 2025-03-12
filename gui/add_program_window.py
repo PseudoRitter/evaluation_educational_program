@@ -27,7 +27,6 @@ def configure_treeview_style():
     style.map("Treeview", background=[("selected", "blue")], foreground=[("selected", "white")])
 
 def load_tables(app):
-    """Загрузка данных в таблицы окна добавления программы."""
     if not hasattr(app, "universities"):
         app.universities = app.logic.db.fetch_universities()
     load_table(app.university_table, app.universities)
@@ -37,12 +36,11 @@ def load_tables(app):
     programs_data = [(p[0], p[1], p[2] or "", p[3], p[4]) for p in app.programs]
     load_table(app.program_table, programs_data)
 
-    # Восстановление выбора программы, если она была выбрана ранее
     if hasattr(app, "last_selected_program_data") and app.last_selected_program_data:
-        name, code = app.last_selected_program_data
+        name, code, university_short = app.last_selected_program_data
         for item in app.program_table.get_children():
             values = app.program_table.item(item)["values"]
-            if values[0] == name and values[1] == code:
+            if values[0] == name and values[1] == code and values[3] == university_short:
                 app.program_table.selection_set(item)
                 app.program_table.focus(item)
                 on_program_table_select(app)  # Обновляем компетенции для выбранной программы
@@ -152,12 +150,11 @@ def create_competence_section(parent_frame, app, window):
     tk.Button(button_frame, text="Удалить", command=lambda: delete_entity(app, window, "competence")).pack(pady=4)
 
 def on_program_table_select(app):
-    """Обработчик выбора программы в таблице."""
     selected_item = app.program_table.selection()
     if not selected_item:
         app.competence_table_add.delete(*app.competence_table_add.get_children())
         app.add_window_selected_program_label.config(text="Выбрана программа: Нет")
-        app.last_selected_program_data = None  # Сбрасываем при отсутствии выбора
+        app.last_selected_program_data = None  
         return
 
     values = app.program_table.item(selected_item[0])["values"]
@@ -195,16 +192,15 @@ def on_program_table_select(app):
         app.last_selected_program_data = None
 
 def edit_entity_window(app, parent_window, entity_type, action):
-    """Создание окна редактирования сущности (ВУЗ, программа, компетенция)."""
     entity_configs = {
         "university": {
-            "title": "ВУЗ" if action == "add" else "Редактирование ВУЗа",
+            "title": "ВУЗ" if action == "add" else " ",
             "fields": [("Наименование ВУЗа:", lambda w: tk.Entry(w, width=60)), ("Сокращение:", tk.Entry), ("Город:", tk.Entry)],
             "size": "400x300",
             "fetch": lambda: app.university_table.item(app.university_table.selection()[0])["values"] if app.university_table.selection() else None
         },
         "program": {
-            "title": "Программа" if action == "add" else "Редактирование программы",
+            "title": "Программа" if action == "add" else " ",
             "fields": [
                 ("Наименование ОП:", lambda w: tk.Entry(w, width=60)),
                 ("Код ОП:", tk.Entry),
@@ -216,7 +212,7 @@ def edit_entity_window(app, parent_window, entity_type, action):
             "fetch": lambda: app.program_table.item(app.program_table.selection()[0])["values"] if app.program_table.selection() else None
         },
         "competence": {
-            "title": "Компетенция" if action == "add" else "Редактирование компетенции",
+            "title": "Компетенция" if action == "add" else " ",
             "fields": [
                 ("Компетенция:", lambda w: scrolledtext.ScrolledText(w, width=80, height=8)),
                 ("Вид компетенции:", lambda w: ttk.Combobox(w, values=[t[1] for t in app.logic.db.fetch_competence_types()], state="readonly"))

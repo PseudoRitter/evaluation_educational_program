@@ -77,7 +77,7 @@ class TextPreprocessor:
     def filter_sentences(self, sentences):
         return [s[:512] for s in sentences]
 
-    def classify_sentences(self, sentences, BATCH_SIZE=64, exclude_category_label=1):
+    def classify_sentences(self, sentences, BATCH_SIZE, exclude_category_label=1):
         try:
             if not sentences:
                 return [], []

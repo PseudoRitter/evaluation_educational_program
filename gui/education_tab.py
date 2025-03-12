@@ -5,8 +5,6 @@ from .add_program_window import create_add_program_window
 from moduls.table_sort import sort_treeview_column  
 
 def create_education_tab(frame, app):
-    """Создание вкладки для выбора образовательной программы."""
-    # Фрейм для таблицы программ
     education_program_frame = tk.Frame(frame)
     education_program_frame.pack(pady=4, fill="x", expand=False)
 
@@ -32,15 +30,12 @@ def create_education_tab(frame, app):
     app.education_table.pack(pady=4, fill="x", expand=False)
     app.education_table.bind("<<TreeviewSelect>>", lambda event: preview_competences(app))
 
-    # Кнопка выбора программы
     app.select_button = tk.Button(frame, text="Выбрать", command=lambda: on_table_select(app))
     app.select_button.pack(pady=4)
 
-    # Метка выбранной программы
     app.selected_program_label = tk.Label(frame, text="Выбрана программа: Нет")
     app.selected_program_label.pack(pady=4)
 
-    # Фрейм компетенций
     app.competence_frame = ttk.LabelFrame(frame, text="Компетенции программы")
     app.competence_frame.pack(pady=4, padx=4, fill="both", expand=False)
 
@@ -165,7 +160,7 @@ def on_table_select(app):
     values = app.education_table.item(selected_item[0])["values"]
     program_id = get_program_id(app, values)
     if program_id:
-        app.selected_program_label.config(text=f"Выбрана программа: {values[0]}")
+        app.selected_program_label.config(text=f"Выбрана программа: {values[0]}, {values[3]}")
         app.program_id = program_id
         logging.info(f"Выбрана программа: {values[0]}, ID: {program_id}")
         preview_competences(app)

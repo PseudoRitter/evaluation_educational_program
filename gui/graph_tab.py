@@ -147,7 +147,7 @@ def display_graph_op_vacancies(app):
         
         for bar, score in zip(bars, scores):
             height = bar.get_height()
-            ax.text(bar.get_x() + BAR_WIDTH / 2, height, f"{height:.2f}", ha="center", va="bottom", fontsize=8)
+            ax.text(bar.get_x() + BAR_WIDTH / 2, height, f"{height:.4f}", ha="center", va="bottom", fontsize=8)
     
     ax.set_ylim(y_min, y_max)
     ax.set_xticks(offsets[n_bars // 2::n_bars])
@@ -245,22 +245,32 @@ def display_graph_vacancies_op(app):
         return
     
     vacancy_name = app.graph_vacancy_table.item(app.graph_vacancy_table.selection()[0], "values")[0]
-    assessment_date = next((a_date for _, _, _, v_name, a_date in app.logic.db.fetch_program_vacancy_history() 
-                           if v_name == vacancy_name), "2025-03-10 00:00")
+    
+    # Получаем историю для фильтрации дат оценки
+    history = app.logic.db.fetch_program_vacancy_history()
     
     program_data = []
     for item in app.program_table.selection():
         program_name, program_code, university, year = app.program_table.item(item, "values")
-        results = app.logic.db.fetch_assessment_results(program_name, vacancy_name, assessment_date)
-        if results:
-            program_data.append({
-                "name": program_name,
-                "program_code": program_code,
-                "university": university,
-                "assessment_date": assessment_date,
-                "group_scores": results.get("group_scores", {}),
-                "overall_score": results.get("overall_score", 0.0)
-            })
+        # Находим дату оценки для конкретной пары (ОП, вакансия)
+        assessment_dates = [a_date for p_name, u_name, p_year, v_name, a_date in history
+                            if p_name == program_name and u_name == university and p_year == year and v_name == vacancy_name]
+        if assessment_dates:
+            assessment_date = assessment_dates[0]  # Берем первую дату, если их несколько
+            results = app.logic.db.fetch_assessment_results(program_name, vacancy_name, assessment_date)
+            if results:
+                program_data.append({
+                    "name": program_name,
+                    "program_code": program_code,
+                    "university": university,
+                    "assessment_date": assessment_date,
+                    "group_scores": results.get("group_scores", {}),
+                    "overall_score": results.get("overall_score", 0.0)
+                })
+    
+    if not program_data:
+        logging.error("Ошибка: Нет данных для построения графика!")
+        return
     
     competence_types = sorted(set().union(*[d["group_scores"].keys() for d in program_data]))[:MAX_COMPETENCES]
     if len(competence_types) > MAX_COMPETENCES:
@@ -290,15 +300,16 @@ def display_graph_vacancies_op(app):
         
         for bar, score in zip(bars, scores):
             height = bar.get_height()
-            ax.text(bar.get_x() + BAR_WIDTH / 2, height, f"{height:.2f}", ha="center", va="bottom", fontsize=8)
+            ax.text(bar.get_x() + BAR_WIDTH / 2, height, f"{height:.4f}", ha="center", va="bottom", fontsize=8)
     
     ax.set_ylim(y_min, y_max)
     ax.set_xticks(offsets[n_bars // 2::n_bars])
-
+    
+    # Формируем подписи с учетом даты оценки
     labels = [
-        f"{d['name']}\n {d['university']}"
-        if len(f"{d['name']} {d['university']}") > 5
-        else f"{d['name']}, {d['university']}"
+        f"{d['name']} \n{d['university']}"
+        if len(f"{d['name']}, {d['university']}") > 5
+        else f"{d['name']} {d['university']}"
         for d in program_data
     ]
 
@@ -308,7 +319,6 @@ def display_graph_vacancies_op(app):
     #     else f"{d['name']} ({d['program_code']}), {d['university']}, {d['assessment_date']}"
     #     for d in program_data
     # ]
-
     ax.set_xticklabels(labels, rotation=45, ha="right")
     ax.set_ylabel("Оценка")
     
