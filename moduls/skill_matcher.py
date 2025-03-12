@@ -2,6 +2,7 @@ from sentence_transformers import SentenceTransformer, util
 import torch
 import logging
 import gc
+import numpy as np
 
 BATCH_SIZE = 64
 
@@ -29,21 +30,26 @@ class SkillMatcher:
         try:
             if not program_skills or not job_descriptions:
                 logging.warning("Нет данных для анализа навыков.")
-                return {"sentence_transformer": {}}
+                return {"sentence_transformer": {}, "frequencies": {}}
 
             self._load_model()
             job_embeddings = self._encode_in_batches(job_descriptions, BATCH_SIZE)
             skill_embeddings = self._encode_in_batches(program_skills, BATCH_SIZE)
 
             similarity_results = {}
+            frequency_results = {}
             for i in range(0, len(program_skills), BATCH_SIZE):
                 batch_skills = program_skills[i:i + BATCH_SIZE]
                 batch_embeddings = skill_embeddings[i:i + BATCH_SIZE]
                 similarity_matrix = util.pytorch_cos_sim(batch_embeddings, job_embeddings)
                 for j, skill in enumerate(batch_skills):
-                    similarity_results[skill.strip()] = similarity_matrix[j].mean().item()
+                    similarities = similarity_matrix[j].cpu().numpy()
+                    mean_similarity = similarities.mean().item()
+                    frequency = np.sum(similarities >= 0.75)  # Подсчет случаев, где сходство > 0.75
+                    similarity_results[skill.strip()] = mean_similarity
+                    frequency_results[skill.strip()] = int(frequency)
 
-            return {"sentence_transformer": similarity_results}
+            return {"sentence_transformer": similarity_results, "frequencies": frequency_results}
         except Exception as e:
             logging.error(f"Ошибка вычисления сходства: {e}", exc_info=True)
             raise

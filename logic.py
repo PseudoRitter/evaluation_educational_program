@@ -159,17 +159,16 @@ class Logic:
             gui.show_info("Шаг 2: Оценка соответствия компетенций...")
             matcher = SkillMatcher(device=device)
             results = matcher.match_skills(skills, filtered_texts.split("\n"), BATCH_SIZE)
-            if isinstance(results["sentence_transformer"], (int, float)):
-                similarity_results = {skill: (results["sentence_transformer"], ctype) for skill, ctype in zip(skills, competence_types)}
-            else:
-                similarity_results = {
-                    skill: (score, ctype) for skill, score, ctype in zip(skills, results["sentence_transformer"].values(), competence_types)
-                }
-            group_scores = self.calculate_competence_group_scores(skills_with_types, results["sentence_transformer"].values() if not isinstance(results["sentence_transformer"], (int, float)) else [results["sentence_transformer"]] * len(skills))
+            similarity_results = {
+                skill: (score, ctype) for skill, score, ctype in zip(skills, results["sentence_transformer"].values(), competence_types)
+            }
+            frequencies = results["frequencies"]  # Сохраняем частоты
+            group_scores = self.calculate_competence_group_scores(skills_with_types, results["sentence_transformer"].values())
             overall_score = self.calculate_overall_score(results["sentence_transformer"])
 
             self.results = {
                 "similarity_results": similarity_results,
+                "frequencies": frequencies,  # Добавляем частоты в результаты
                 "group_scores": group_scores,
                 "overall_score": overall_score,
                 "original_texts": original_texts,

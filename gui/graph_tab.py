@@ -15,9 +15,11 @@ BAR_WIDTH = 0.12
 GROUP_SPACING_FACTOR = 1.5
 
 def create_graph_tab(graph_frame, app):
+    # Создаем ноутбук (вкладки)
     notebook = ttk.Notebook(graph_frame)
     notebook.pack(fill="both", expand=True, padx=10, pady=5)
 
+    # Пример других вкладок (оставляем как есть)
     tab1 = ttk.Frame(notebook)
     notebook.add(tab1, text="Сравнение ОП и Вакансий")
     create_comparison_op_vacancies_tab(tab1, app)
@@ -26,7 +28,41 @@ def create_graph_tab(graph_frame, app):
     notebook.add(tab2, text="Сравнение Вакансий и ОП")
     create_comparison_vacancies_op_tab(tab2, app)
 
+    # Создаем вкладку для гистограммы частот
+    frequency_tab = ttk.Frame(notebook)
+    notebook.add(frequency_tab, text="Гистограмма частот")
+    app.frequency_tab = frequency_tab
+
+    # Фрейм для таблицы компетенций
+    competence_frame = ttk.LabelFrame(frequency_tab, text="Компетенции образовательной программы")
+    competence_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+    # Создаем таблицу компетенций
+    columns = ("competence", "type", "number")
+    app.competence_frequency_table = ttk.Treeview(competence_frame, columns=columns, show="headings", height=5)
+    app.competence_frequency_table.pack(fill="both", expand=True, padx=5, pady=5)
+
+    app.competence_frequency_table.heading("competence", text="Компетенция", command=lambda: sort_treeview_column(app.competence_frequency_table, "competence"))
+    app.competence_frequency_table.heading("type", text="Вид компетенции", command=lambda: sort_treeview_column(app.competence_frequency_table, "type"))
+    app.competence_frequency_table.heading("number", text="Порядковый номер", command=lambda: sort_treeview_column(app.competence_frequency_table, "number"))
+
+    app.competence_frequency_table.column("competence", width=300)
+    app.competence_frequency_table.column("type", width=150)
+    app.competence_frequency_table.column("number", width=100)
+
+
+    display_button = ttk.Button(frequency_tab, text="обновить", command=lambda: load_competence_frequency_table(app))
+    display_button.pack(pady=10)
+
+    # Кнопка для отображения гистограммы
+    display_button = ttk.Button(frequency_tab, text="Отобразить гистограмму", command=lambda: display_frequency_histogram(app))
+    display_button.pack(pady=10)
+
+    # Загружаем данные в таблицу
+    load_competence_frequency_table(app)
+
 def create_comparison_op_vacancies_tab(frame, app):
+    """Создание содержимого вкладки 'Сравнение ОП и Вакансий'."""
     program_frame = ttk.LabelFrame(frame, text="Выберите ОП для графиков")
     program_frame.pack(fill="both", expand=True, padx=10, pady=5)
     
@@ -68,6 +104,7 @@ def create_comparison_op_vacancies_tab(frame, app):
     load_graph_program_table(app)
 
 def load_graph_program_table(app):
+    """Загрузка списка ОП в таблицу."""
     for item in app.graph_program_table.get_children():
         app.graph_program_table.delete(item)
     
@@ -83,6 +120,7 @@ def load_graph_program_table(app):
         logging.error(f"Ошибка загрузки таблицы ОП для графиков: {e}")
 
 def on_program_select(app):
+    """Обработка выбора ОП и загрузка связанных вакансий."""
     selected = app.graph_program_table.selection()
     if not selected:
         return
@@ -102,7 +140,7 @@ def on_program_select(app):
         logging.error(f"Ошибка загрузки вакансий: {e}")
 
 def display_graph_op_vacancies(app):
-    """Построение графиков для выбранных вакансий в отдельном окне."""
+    """Построение графиков соответствия ОП и вакансий в отдельном окне."""
     if not app.graph_program_table.selection():
         logging.error("Ошибка: Выберите образовательную программу!")
         return
@@ -206,7 +244,6 @@ def create_comparison_vacancies_op_tab(frame, app):
     load_graph_vacancy_table(app)
 
 def load_graph_vacancy_table(app):
-    """Загрузка списка вакансий с оценками в таблицу."""
     app.graph_vacancy_table.delete(*app.graph_vacancy_table.get_children())
     try:
         unique_vacancies = {v_name for _, _, _, v_name, _ in app.logic.db.fetch_program_vacancy_history()}
@@ -236,7 +273,7 @@ def on_vacancy_select(app):
         logging.error(f"Ошибка загрузки ОП: {e}")
 
 def display_graph_vacancies_op(app):
-    """Построение графиков для выбранных ОП в отдельном окне."""
+    """Построение графиков соответствия вакансии и ОП в отдельном окне."""
     if not app.graph_vacancy_table.selection():
         logging.error("Ошибка: Выберите вакансию!")
         return
@@ -246,17 +283,15 @@ def display_graph_vacancies_op(app):
     
     vacancy_name = app.graph_vacancy_table.item(app.graph_vacancy_table.selection()[0], "values")[0]
     
-    # Получаем историю для фильтрации дат оценки
     history = app.logic.db.fetch_program_vacancy_history()
     
     program_data = []
     for item in app.program_table.selection():
         program_name, program_code, university, year = app.program_table.item(item, "values")
-        # Находим дату оценки для конкретной пары (ОП, вакансия)
         assessment_dates = [a_date for p_name, u_name, p_year, v_name, a_date in history
                             if p_name == program_name and u_name == university and p_year == year and v_name == vacancy_name]
         if assessment_dates:
-            assessment_date = assessment_dates[0]  # Берем первую дату, если их несколько
+            assessment_date = assessment_dates[0]
             results = app.logic.db.fetch_assessment_results(program_name, vacancy_name, assessment_date)
             if results:
                 program_data.append({
@@ -276,8 +311,7 @@ def display_graph_vacancies_op(app):
     if len(competence_types) > MAX_COMPETENCES:
         logging.warning(f"Более {MAX_COMPETENCES} видов компетенций, будут использованы только первые {MAX_COMPETENCES}.")
     
-    all_scores = [score for program in program_data for score in 
-                  [program["group_scores"].get(ctype, 0.0) for ctype in competence_types] + [program["overall_score"]]]
+    all_scores = [score for program in program_data for score in [program["group_scores"].get(ctype, 0.0) for ctype in competence_types] + [program["overall_score"]]]
     y_min = max(0, min(all_scores) - Y_MARGIN_MIN)
     y_max = min(1, max(all_scores) + Y_MARGIN_MAX)
     
@@ -304,21 +338,12 @@ def display_graph_vacancies_op(app):
     
     ax.set_ylim(y_min, y_max)
     ax.set_xticks(offsets[n_bars // 2::n_bars])
-    
-    # Формируем подписи с учетом даты оценки
     labels = [
         f"{d['name']} \n{d['university']}"
         if len(f"{d['name']}, {d['university']}") > 5
         else f"{d['name']} {d['university']}"
         for d in program_data
     ]
-
-    # labels = [
-    #     f"{d['name']} ({d['program_code']})\n{d['university']}, {d['assessment_date']}"
-    #     if len(f"{d['name']} ({d['program_code']}), {d['university']}, {d['assessment_date']}") > 30
-    #     else f"{d['name']} ({d['program_code']}), {d['university']}, {d['assessment_date']}"
-    #     for d in program_data
-    # ]
     ax.set_xticklabels(labels, rotation=45, ha="right")
     ax.set_ylabel("Оценка")
     
@@ -334,3 +359,101 @@ def display_graph_vacancies_op(app):
     canvas.draw()
     canvas.get_tk_widget().pack(fill="both", expand=True)
     logging.info(f"Графики построены для {len(program_data)} ОП")
+
+def display_frequency_histogram(app):
+    """Отображение гистограммы частот в новом окне на основе таблицы компетенций."""
+    if not app.competence_frequency_table.get_children():
+        logging.error("Ошибка: Таблица компетенций пуста!")
+        return
+
+    competences = []
+    for item in app.competence_frequency_table.get_children():
+        values = app.competence_frequency_table.item(item, "values")
+        if len(values) != 3:
+            logging.error(f"Некорректное количество значений в строке таблицы: {values}")
+            continue
+        competences.append({"competence": values[0], "type": values[1], "number": values[2]})
+        logging.debug(f"Извлечена компетенция: {values[0]}, тип: {values[1]}, номер: {values[2]}")
+
+    if not competences:
+        logging.error("Ошибка: Нет корректных данных для построения гистограммы!")
+        return
+
+    frequencies = app.logic.results.get("frequencies", {}) if hasattr(app.logic, 'results') and app.logic.results else {}
+    logging.debug(f"Частоты для гистограммы: {frequencies}")
+
+    histogram_window = tk.Toplevel(app.root)
+    histogram_window.title("Гистограмма частот")
+    histogram_window.geometry("800x600")
+
+    plot_frequency_histogram(histogram_window, competences, frequencies)
+
+def plot_frequency_histogram(window, competences, frequencies):
+    """Построение гистограммы частот в новом окне."""
+    numbers = [comp["number"] for comp in competences]
+    freq_values = [frequencies.get(comp["competence"], 0) for comp in competences]
+
+    logging.debug(f"Порядковые номера для гистограммы: {numbers}")
+    logging.debug(f"Частоты для гистограммы: {freq_values}")
+
+    fig = Figure(figsize=(10, len(numbers) * 0.4))
+    ax = fig.add_subplot(111)
+    ax.barh(numbers, freq_values, color='skyblue')
+    ax.set_xlabel("Частота упоминания")
+    ax.set_ylabel("Порядковый номер компетенции")
+    ax.set_title("Частота упоминания компетенций в вакансиях (сходство > 0.9)")
+
+    canvas = FigureCanvasTkAgg(fig, master=window)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill="both", expand=True)
+
+def load_competence_frequency_table(app):
+    """Загрузка компетенций в таблицу на вкладке 'Гистограмма частот'."""
+    app.competence_frequency_table.delete(*app.competence_frequency_table.get_children())
+    
+    try:
+        if not hasattr(app.logic, 'results') or app.logic.results is None or "similarity_results" not in app.logic.results:
+            logging.warning("Нет данных о компетенциях в app.logic.results['similarity_results']. Таблица останется пустой.")
+            return
+        
+        similarity_results = app.logic.results["similarity_results"]
+        if not similarity_results:
+            logging.warning("app.logic.results['similarity_results'] пуст. Таблица останется пустой.")
+            return
+
+        logging.info(f"Загружаем данные из similarity_results: {similarity_results}")
+        for i, (skill, value) in enumerate(similarity_results.items(), 1):
+            if not isinstance(value, tuple) or len(value) < 2:
+                logging.warning(f"Некорректная структура данных для '{skill}': {value}. Используем значение по умолчанию.")
+                ctype = "Неизвестно"
+            else:
+                ctype = value[1]
+            
+            app.competence_frequency_table.insert("", "end", values=(skill, ctype, str(i)))
+            logging.debug(f"Добавлена запись: компетенция={skill}, тип={ctype}, номер={i}")
+        
+        logging.info(f"Таблица компетенций успешно загружена. Записей: {len(similarity_results)}")
+        
+        # Проверяем содержимое таблицы
+        for item in app.competence_frequency_table.get_children():
+            values = app.competence_frequency_table.item(item, "values")
+            logging.debug(f"Содержимое таблицы: {values}")
+            
+    except Exception as e:
+        logging.error(f"Ошибка загрузки таблицы компетенций: {e}")
+
+def plot_frequency_histogram(window, competences, frequencies):
+    """Построение гистограммы частот в новом окне."""
+    numbers = [comp["number"] for comp in competences]
+    freq_values = [frequencies.get(comp["competence"], 0) for comp in competences]
+
+    fig = Figure(figsize=(10, len(numbers) * 0.4))
+    ax = fig.add_subplot(111)
+    ax.barh(numbers, freq_values, color='skyblue')
+    ax.set_xlabel("Частота упоминания")
+    ax.set_ylabel("Порядковый номер компетенции")
+    ax.set_title("Частота упоминания компетенций в вакансиях (сходство > 0.75)")
+
+    canvas = FigureCanvasTkAgg(fig, master=window)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill="both", expand=True)
