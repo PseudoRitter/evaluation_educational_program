@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 import logging
 from .add_program_window import create_add_program_window
-from moduls.table_sort import sort_treeview_column  
+from moduls.table_sort import sort_treeview_column, sort_competence_type_column  
 
 def create_education_tab(frame, app):
     education_program_frame = tk.Frame(frame)
@@ -39,16 +39,11 @@ def create_education_tab(frame, app):
     app.competence_frame = ttk.LabelFrame(frame, text="Компетенции программы")
     app.competence_frame.pack(pady=4, padx=4, fill="both", expand=False)
 
-    app.competence_table = ttk.Treeview(
-        app.competence_frame,
-        columns=("competence", "competence_type"),
-        show="headings",
-        height=12
-    )
-    app.competence_table.heading("competence", text="Компетенция", command=lambda: sort_treeview_column(app.competence_table, "competence", False))
-    app.competence_table.heading("competence_type", text="Вид компетенции", command=lambda: sort_treeview_column(app.competence_table, "competence_type", False))
-    app.competence_table.column("competence", width=550, stretch=True)
-    app.competence_table.column("competence_type", width=150)
+    app.competence_table = ttk.Treeview(app.competence_frame, columns=("competence", "competence_type"), show="headings", height=12)
+    app.competence_table.heading("competence", text="Компетенция")
+    app.competence_table.heading("competence_type", text="Вид компетенции", command=lambda: sort_competence_type_column(app.competence_table, "competence_type"))
+    app.competence_table.column("competence", width=620, stretch=True)
+    app.competence_table.column("competence_type", width=80)
     app.competence_table.pack(pady=4, fill="both", expand=False)
 
     # Кнопка добавления программы

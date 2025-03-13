@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext
 import logging
 import re
-from moduls.table_sort import sort_treeview_column  
+from moduls.table_sort import sort_treeview_column, sort_competence_type_column  
 
 def create_add_program_window(root, app):
     """Создание окна для добавления образовательной программы."""
@@ -102,17 +102,17 @@ def create_program_section(parent_frame, app, window):
     table_frame = ttk.LabelFrame(container, text="Добавить образовательную программу")
     table_frame.pack(side=tk.LEFT, pady=2, padx=4, fill="both", expand=True)
 
-    app.program_table = ttk.Treeview(table_frame, columns=("name", "code", "year", "university_short", "type"), show="headings", height=7)
+    app.program_table = ttk.Treeview(table_frame, columns=("name", "code", "year", "university_short", "type_ed"), show="headings", height=7)
     app.program_table.heading("name", text="Наименование ОП", command=lambda: sort_treeview_column(app.program_table, "name", False))
     app.program_table.heading("code", text="Код ОП", command=lambda: sort_treeview_column(app.program_table, "code", False))
     app.program_table.heading("year", text="Год ОП", command=lambda: sort_treeview_column(app.program_table, "year", False))
     app.program_table.heading("university_short", text="ВУЗ", command=lambda: sort_treeview_column(app.program_table, "university_short", False))
-    app.program_table.heading("type", text="Вид ОП", command=lambda: sort_treeview_column(app.program_table, "name", False))
+    app.program_table.heading("type_ed", text="Вид ОП", command=lambda: sort_treeview_column(app.program_table, "name", False))
     app.program_table.column("name", width=280)
     app.program_table.column("code", width=50)
     app.program_table.column("year", width=50)
     app.program_table.column("university_short", width=50)
-    app.program_table.column("type", width=100)
+    app.program_table.column("type_ed", width=100)
     app.program_table.pack(pady=2, fill="both", expand=True)
     app.program_table.bind("<<TreeviewSelect>>", lambda event: on_program_table_select(app))
 
@@ -136,11 +136,11 @@ def create_competence_section(parent_frame, app, window):
     table_frame = ttk.LabelFrame(container, text="Добавить компетенции")
     table_frame.pack(side=tk.LEFT, pady=2, padx=4, fill="both", expand=True)
 
-    app.competence_table_add = ttk.Treeview(table_frame, columns=("competence", "type"), show="headings", height=14)
-    app.competence_table_add.heading("competence", text="Компетенция", command=lambda: sort_treeview_column(app.competence_table_add, "competence", False))
-    app.competence_table_add.heading("type", text="Вид компетенции", command=lambda: sort_treeview_column(app.competence_table_add, "type", False))
+    app.competence_table_add = ttk.Treeview(table_frame, columns=("competence", "competence_type"), show="headings", height=14)
+    app.competence_table_add.heading("competence", text="Компетенция")
+    app.competence_table_add.heading("competence_type", text="Вид компетенции", command=lambda: sort_competence_type_column(app.competence_table_add, "competence_type"))
     app.competence_table_add.column("competence", width=430)
-    app.competence_table_add.column("type", width=70)
+    app.competence_table_add.column("competence_type", width=70)
     app.competence_table_add.pack(pady=2, fill="both", expand=True)
 
     button_frame = tk.Frame(container)

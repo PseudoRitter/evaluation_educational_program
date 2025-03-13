@@ -5,7 +5,9 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import numpy as np
-from moduls.table_sort import sort_treeview_column
+from moduls.table_sort import sort_treeview_column, sort_competence_type_column
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 COLORS = ["#FFA500", "#0000FF", "#008000", "#FF0000"]  # Оранжевый, синий, зелёный, красный
 MAX_COMPETENCES = 3
@@ -15,11 +17,9 @@ BAR_WIDTH = 0.12
 GROUP_SPACING_FACTOR = 1.5
 
 def create_graph_tab(graph_frame, app):
-    # Создаем ноутбук (вкладки)
     notebook = ttk.Notebook(graph_frame)
     notebook.pack(fill="both", expand=True, padx=10, pady=5)
 
-    # Пример других вкладок (оставляем как есть)
     tab1 = ttk.Frame(notebook)
     notebook.add(tab1, text="Сравнение ОП и Вакансий")
     create_comparison_op_vacancies_tab(tab1, app)
@@ -28,38 +28,10 @@ def create_graph_tab(graph_frame, app):
     notebook.add(tab2, text="Сравнение Вакансий и ОП")
     create_comparison_vacancies_op_tab(tab2, app)
 
-    # Создаем вкладку для гистограммы частот
-    frequency_tab = ttk.Frame(notebook)
-    notebook.add(frequency_tab, text="Гистограмма частот")
-    app.frequency_tab = frequency_tab
+    tab3 = ttk.Frame(notebook)
+    notebook.add(tab3, text="Гистограмма частот")
+    create_frequency_tab(tab3, app)
 
-    # Фрейм для таблицы компетенций
-    competence_frame = ttk.LabelFrame(frequency_tab, text="Компетенции образовательной программы")
-    competence_frame.pack(fill="both", expand=True, padx=10, pady=5)
-
-    # Создаем таблицу компетенций
-    columns = ("competence", "type", "number")
-    app.competence_frequency_table = ttk.Treeview(competence_frame, columns=columns, show="headings", height=5)
-    app.competence_frequency_table.pack(fill="both", expand=True, padx=5, pady=5)
-
-    app.competence_frequency_table.heading("competence", text="Компетенция", command=lambda: sort_treeview_column(app.competence_frequency_table, "competence"))
-    app.competence_frequency_table.heading("type", text="Вид компетенции", command=lambda: sort_treeview_column(app.competence_frequency_table, "type"))
-    app.competence_frequency_table.heading("number", text="Порядковый номер", command=lambda: sort_treeview_column(app.competence_frequency_table, "number"))
-
-    app.competence_frequency_table.column("competence", width=300)
-    app.competence_frequency_table.column("type", width=150)
-    app.competence_frequency_table.column("number", width=100)
-
-
-    display_button = ttk.Button(frequency_tab, text="обновить", command=lambda: load_competence_frequency_table(app))
-    display_button.pack(pady=10)
-
-    # Кнопка для отображения гистограммы
-    display_button = ttk.Button(frequency_tab, text="Отобразить гистограмму", command=lambda: display_frequency_histogram(app))
-    display_button.pack(pady=10)
-
-    # Загружаем данные в таблицу
-    load_competence_frequency_table(app)
 
 def create_comparison_op_vacancies_tab(frame, app):
     """Создание содержимого вкладки 'Сравнение ОП и Вакансий'."""
@@ -360,6 +332,31 @@ def display_graph_vacancies_op(app):
     canvas.get_tk_widget().pack(fill="both", expand=True)
     logging.info(f"Графики построены для {len(program_data)} ОП")
 
+def create_frequency_tab(frame, app):
+    # Фрейм для таблицы компетенций
+    competence_frame = ttk.LabelFrame(frame, text="Компетенции образовательной программы")
+    competence_frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+    columns = ("competence", "competence_type", "number")
+    app.competence_frequency_table = ttk.Treeview(competence_frame, columns=columns, show="headings", height=5)
+    app.competence_frequency_table.pack(fill="both", expand=True, padx=5, pady=5)
+
+    app.competence_frequency_table.heading("competence", text="Компетенция")
+    app.competence_frequency_table.heading("competence_type", text="Вид компетенции", command=lambda: sort_competence_type_column(app.competence_frequency_table, "competence_type"))
+    app.competence_frequency_table.heading("number", text="Порядковый номер")
+
+    app.competence_frequency_table.column("competence", width=650)
+    app.competence_frequency_table.column("competence_type", width=150)
+    app.competence_frequency_table.column("number", width=100)
+
+    display_button = ttk.Button(frame, text="обновить", command=lambda: load_competence_frequency_table(app))
+    display_button.pack(pady=10)
+
+    display_button = ttk.Button(frame, text="Отобразить гистограмму", command=lambda: display_frequency_histogram(app))
+    display_button.pack(pady=10)
+
+    load_competence_frequency_table(app)
+
 def display_frequency_histogram(app):
     """Отображение гистограммы частот в новом окне на основе таблицы компетенций."""
     if not app.competence_frequency_table.get_children():
@@ -401,16 +398,16 @@ def plot_frequency_histogram(window, competences, frequencies):
     ax.barh(numbers, freq_values, color='skyblue')
     ax.set_xlabel("Частота упоминания")
     ax.set_ylabel("Порядковый номер компетенции")
-    ax.set_title("Частота упоминания компетенций в вакансиях (сходство > 0.9)")
+    ax.set_title("Частота упоминания компетенций в вакансиях (сходство > 0.5)")
 
     canvas = FigureCanvasTkAgg(fig, master=window)
     canvas.draw()
     canvas.get_tk_widget().pack(fill="both", expand=True)
 
 def load_competence_frequency_table(app):
-    """Загрузка компетенций в таблицу на вкладке 'Гистограмма частот'."""
+    """Загрузка компетенций в таблицу на вкладке 'Гистограмма частот' с сортировкой и нумерацией."""
     app.competence_frequency_table.delete(*app.competence_frequency_table.get_children())
-    
+   
     try:
         if not hasattr(app.logic, 'results') or app.logic.results is None or "similarity_results" not in app.logic.results:
             logging.warning("Нет данных о компетенциях в app.logic.results['similarity_results']. Таблица останется пустой.")
@@ -422,17 +419,31 @@ def load_competence_frequency_table(app):
             return
 
         logging.info(f"Загружаем данные из similarity_results: {similarity_results}")
-        for i, (skill, value) in enumerate(similarity_results.items(), 1):
+        
+        # Шаг 1: Загружаем данные в таблицу без номеров
+        for skill, value in similarity_results.items():
             if not isinstance(value, tuple) or len(value) < 2:
                 logging.warning(f"Некорректная структура данных для '{skill}': {value}. Используем значение по умолчанию.")
                 ctype = "Неизвестно"
             else:
                 ctype = value[1]
             
-            app.competence_frequency_table.insert("", "end", values=(skill, ctype, str(i)))
-            logging.debug(f"Добавлена запись: компетенция={skill}, тип={ctype}, номер={i}")
-        
-        logging.info(f"Таблица компетенций успешно загружена. Записей: {len(similarity_results)}")
+            # Вставляем строку без номера (номер пока пустой)
+            app.competence_frequency_table.insert("", "end", values=(skill, ctype, ""))
+            logging.debug(f"Добавлена временная запись: компетенция={skill}, тип={ctype}")
+
+        # Шаг 2: Сортируем таблицу по столбцу "Вид компетенции"
+        sort_competence_type_column(app.competence_frequency_table, "competence_type")
+        logging.info("Таблица отсортирована по видам компетенций.")
+
+        # Шаг 3: Присваиваем порядковые номера после сортировки
+        for i, item in enumerate(app.competence_frequency_table.get_children(), 1):
+            values = app.competence_frequency_table.item(item, "values")
+            # Обновляем строку, добавляя номер
+            app.competence_frequency_table.item(item, values=(values[0], values[1], str(i)))
+            logging.debug(f"Обновлена запись: компетенция={values[0]}, тип={values[1]}, номер={i}")
+
+        logging.info(f"Таблица компетенций успешно загружена и отсортирована. Записей: {len(similarity_results)}")
         
         # Проверяем содержимое таблицы
         for item in app.competence_frequency_table.get_children():
@@ -443,17 +454,60 @@ def load_competence_frequency_table(app):
         logging.error(f"Ошибка загрузки таблицы компетенций: {e}")
 
 def plot_frequency_histogram(window, competences, frequencies):
-    """Построение гистограммы частот в новом окне."""
+    """Построение гистограммы частот в новом окне с цветами, легендой, значениями и расширенной осью X."""
     numbers = [comp["number"] for comp in competences]
     freq_values = [frequencies.get(comp["competence"], 0) for comp in competences]
+    competence_types = [comp["type"] for comp in competences]
 
+    # Определяем цвета для каждого типа компетенций
+    color_map = {
+        "Универсальная компетенция": "green",
+        "Общепрофессиональная компетенция": "orange",
+        "Профессиональная компетенция": "blue"
+    }
+    # Назначаем цвета для каждого столбца, если тип неизвестен — серый
+    colors = [color_map.get(ctype, "gray") for ctype in competence_types]
+
+    logging.debug(f"Порядковые номера для гистограммы: {numbers}")
+    logging.debug(f"Частоты для гистограммы: {freq_values}")
+    logging.debug(f"Типы компетенций: {competence_types}")
+    logging.debug(f"Цвета столбцов: {colors}")
+
+    # Создаем фигуру
     fig = Figure(figsize=(10, len(numbers) * 0.4))
     ax = fig.add_subplot(111)
-    ax.barh(numbers, freq_values, color='skyblue')
+
+    # Рисуем горизонтальную гистограмму с цветами
+    bars = ax.barh(numbers, freq_values, color=colors)
     ax.set_xlabel("Частота упоминания")
     ax.set_ylabel("Порядковый номер компетенции")
-    ax.set_title("Частота упоминания компетенций в вакансиях (сходство > 0.75)")
+    ax.set_title("Частота упоминания компетенций в вакансиях (сходство > 0.5)")
 
+    # Устанавливаем пределы оси X: от 0 до N + 10, где N — максимальная частота
+    max_freq = max(freq_values) if freq_values else 0  # Проверка на случай пустого списка
+    ax.set_xlim(0, max_freq + (max_freq * 0.5))
+    logging.debug(f"Установлены пределы оси X: [0, {max_freq + 10}]")
+
+    # Добавляем значения на столбцы
+    for bar, freq in zip(bars, freq_values):
+        width = bar.get_width()  # Длина столбца
+        y_pos = bar.get_y() + bar.get_height() / 2  # Центр столбца по вертикали
+        # Если столбец слишком короткий (< 5), размещаем значение справа, иначе внутри
+        if width < 5:
+            ax.text(width, y_pos, str(freq), ha="left", va="center", fontsize=8)
+        else:
+            ax.text(width, y_pos, str(freq), ha="right", va="center", fontsize=8, color="white")
+
+    # Создаем легенду
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor="green", label="Универсальная компетенция"),
+        Patch(facecolor="orange", label="Общепрофессиональная компетенция"),
+        Patch(facecolor="blue", label="Профессиональная компетенция")
+    ]
+    ax.legend(handles=legend_elements, title="Виды компетенций", loc="best")
+
+    # Встраиваем график в окно
     canvas = FigureCanvasTkAgg(fig, master=window)
     canvas.draw()
     canvas.get_tk_widget().pack(fill="both", expand=True)

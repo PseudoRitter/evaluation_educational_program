@@ -9,8 +9,6 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 BATCH_SIZE = 64
 
 class TextPreprocessor:
-    """Класс для предварительной обработки текста и классификации предложений."""
-
     def __init__(self, model_path="C:/python-models/fine_tuned_model_v4"):
         self.model_path = os.path.normpath(model_path)
         if not os.path.exists(self.model_path):

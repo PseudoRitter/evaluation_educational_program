@@ -3,25 +3,18 @@ import numpy as np
 from tkinter import ttk, scrolledtext, messagebox
 import logging
 from moduls.export_to_excel import ExcelExporter
-from moduls.table_sort import sort_treeview_column  
-from gui.graph_tab import load_graph_program_table  # Импортируем функцию из graph_tab
+from moduls.table_sort import sort_treeview_column, sort_competence_type_column  
+from gui.graph_tab import load_graph_program_table  
 
 
 def create_rating_history_tab(frame, app):
-    """Создание вкладки истории оценок."""
     main_frame = tk.Frame(frame)
     main_frame.pack(fill="both", expand=True, pady=5)
 
-    # Таблица программ и вакансий
     program_vacancy_frame = tk.LabelFrame(main_frame, text="Образовательная программа и оцениваемая вакансия")
     program_vacancy_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-    app.program_vacancy_history_table = ttk.Treeview(
-        program_vacancy_frame,
-        columns=("educational_program", "university", "year", "vacancy", "assessment_date"),
-        show="headings",
-        height=6
-    )
+    app.program_vacancy_history_table = ttk.Treeview(program_vacancy_frame, columns=("educational_program", "university", "year", "vacancy", "assessment_date"), show="headings",height=6)
     app.program_vacancy_history_table.heading("educational_program", text="Образовательная программа", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "educational_program", False))
     app.program_vacancy_history_table.heading("university", text="ВУЗ", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "university", False))
     app.program_vacancy_history_table.heading("year", text="Год", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "year", False))
@@ -35,25 +28,18 @@ def create_rating_history_tab(frame, app):
     app.program_vacancy_history_table.pack(fill="both", expand=True)
     app.program_vacancy_history_table.bind("<<TreeviewSelect>>", lambda event: update_competence_history_table(app))
 
-    # Таблица компетенций
     competence_frame = tk.LabelFrame(main_frame, text="Оценка компетенций образовательной программы")
     competence_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-    app.competence_history_table = ttk.Treeview(
-        competence_frame,
-        columns=("competence", "type_competence", "score"),
-        show="headings",
-        height=6
-    )
-    app.competence_history_table.heading("competence", text="Компетенция", command=lambda: sort_treeview_column(app.competence_history_table, "competence", False))
-    app.competence_history_table.heading("type_competence", text="Вид компетенции", command=lambda: sort_treeview_column(app.competence_history_table, "type_competence", False))
+    app.competence_history_table = ttk.Treeview(competence_frame, columns=("competence", "competence_type", "score"), show="headings", height=6)
+    app.competence_history_table.heading("competence", text="Компетенция")
+    app.competence_history_table.heading("competence_type", text="Вид компетенции", command=lambda: sort_competence_type_column(app.competence_history_table, "competence_type"))
     app.competence_history_table.heading("score", text="Оценка")
-    app.competence_history_table.column("competence", width=400)
-    app.competence_history_table.column("type_competence", width=300)
-    app.competence_history_table.column("score", width=150)
+    app.competence_history_table.column("competence", width=650)
+    app.competence_history_table.column("competence_type", width=160)
+    app.competence_history_table.column("score", width=50)
     app.competence_history_table.pack(fill="both", expand=True)
 
-    # Контейнер результатов
     results_container = tk.Frame(main_frame)
     results_container.pack(pady=4, fill="both", expand=False)
     group_scores_frame = tk.LabelFrame(results_container, text="Оценки групп и программы:")
@@ -61,7 +47,6 @@ def create_rating_history_tab(frame, app):
     app.group_scores_history_frame = scrolledtext.ScrolledText(group_scores_frame, width=120, height=8)
     app.group_scores_history_frame.pack(pady=4)
 
-    # Кнопка экспорта и удаления
     export_frame = tk.Frame(main_frame)
     export_frame.pack(pady=4, fill="both", expand=False)
     app.export_history_button = tk.Button(export_frame, text="Экспорт в Excel", command=lambda: export_history_to_excel(app))
@@ -90,7 +75,7 @@ def export_history_to_excel(app):
             university=university_short,
             year=year
         )
-        message = exporter.export_history_to_excel()  # Используем новую функцию
+        message = exporter.export_history_to_excel()  
         if "успешно экспортированы" in message:
             logging.info(message)
         else:
@@ -99,14 +84,13 @@ def export_history_to_excel(app):
         logging.error(f"Ошибка экспорта: {e}", exc_info=True)
 
 def load_program_vacancy_history_table(app):
-    """Загрузка данных в таблицу программ и вакансий."""
     try:
         app.program_vacancy_history_table.delete(*app.program_vacancy_history_table.get_children())
         rows = app.logic.db.fetch_program_vacancy_history()
         logging.info(f"Загружено {len(rows)} строк из таблицы assessment")
         for row in rows:
             program_name, university_short, year, vacancy_name, assessment_date = row
-            year = year if year else ""  # Обрабатываем NULL для года
+            year = year if year else "" 
             assessment_date_str = assessment_date if assessment_date else "Не указана"
             app.program_vacancy_history_table.insert("", tk.END, values=(program_name, university_short, year, vacancy_name, assessment_date_str))
         if app.program_vacancy_history_table.get_children():

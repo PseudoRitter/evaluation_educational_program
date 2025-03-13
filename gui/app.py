@@ -10,6 +10,8 @@ from .assessment_tab import create_assessment_tab
 from .assessment_history_tab import create_rating_history_tab
 from .graph_tab import create_graph_tab
 
+BATCH_SIZE = 64
+
 class App:
     """Основной класс приложения для оценки соответствия образовательных программ."""
 
@@ -83,8 +85,30 @@ class App:
             self.show_error(f"Не удалось загрузить вакансии: {e}")
 
     def start_analysis(self):
-        future = self.executor.submit(self.logic.run_analysis, self.program_id, self.selected_vacancy_id, self, 64)
-        future.add_done_callback(self.on_analysis_complete)
+        """Запуск анализа соответствия программы и вакансии с учетом порогового значения."""
+        if not self.program_id or not self.selected_vacancy_id:
+            self.show_error("Выберите образовательную программу и вакансию перед запуском анализа!")
+            return
+
+        try:
+            # Получаем пороговое значение из поля ввода
+            threshold_str = self.threshold_entry.get()
+            threshold = float(threshold_str) if threshold_str.strip() else 0.5
+            if not (0 <= threshold <= 1):
+                self.show_error("Пороговое значение должно быть от 0 до 1!")
+                return
+
+            logging.debug(f"Запуск анализа с порогом: {threshold}")
+            self.show_info("Запуск анализа...")
+
+            # Запускаем анализ в отдельном потоке с передачей threshold
+            future = self.executor.submit(self.logic.run_analysis, self.program_id, self.selected_vacancy_id, self, BATCH_SIZE, threshold)
+            future.add_done_callback(self.on_analysis_complete)
+        except ValueError:
+            self.show_error("Введите корректное числовое значение порога (от 0 до 1)!")
+        except Exception as e:
+            logging.error(f"Ошибка при запуске анализа: {e}", exc_info=True)
+            self.show_error(f"Ошибка при запуске анализа: {e}")
 
     def on_analysis_complete(self, future):
         try:

@@ -90,23 +90,23 @@ class Logic:
             logging.error(f"Ошибка загрузки описаний из {full_path}: {e}")
             return []
 
-    def run_analysis(self, program_id, vacancy_id, gui, BATCH_SIZE):
+    def run_analysis(self, program_id, vacancy_id, gui, batch_size, threshold=0.5):
         try:
             vacancy = self.db.fetch_vacancy_details(vacancy_id)
             if not vacancy:
                 gui.show_error("Вакансия не найдена в базе данных!")
                 logging.error("Вакансия не найдена в базе данных.")
                 return {}
-            self.vacancy_file = vacancy[3] 
+            self.vacancy_file = vacancy[3]
 
-            full_path = os.path.join(self.db.data_dir, self.vacancy_file)  
+            full_path = os.path.join(self.db.data_dir, self.vacancy_file)
             if not os.path.exists(full_path):
                 gui.show_error(f"Файл с вакансиями не найден: {full_path}")
                 logging.error(f"Файл с вакансиями не найден: {full_path}")
                 return {}
             
             logging.debug(f"Загружаем файл: {full_path}")
-            job_descriptions = self.load_vacancy_descriptions_field(full_path)  
+            job_descriptions = self.load_vacancy_descriptions_field(full_path)
             logging.debug(f"Загружено описаний: {len(job_descriptions)}")
             if not job_descriptions:
                 gui.show_error(f"Файл {full_path} не содержит описаний вакансий!")
@@ -119,11 +119,11 @@ class Logic:
                 logging.error("Образовательная программа не найдена в базе данных.")
                 return {}
             
-            skills = [skill for skill, _ in skills_with_types]  
-            competence_types = [ctype for _, ctype in skills_with_types]  
+            skills = [skill for skill, _ in skills_with_types]
+            competence_types = [ctype for _, ctype in skills_with_types]
 
             preprocessor = TextPreprocessor()
-            device = preprocessor.device  
+            device = preprocessor.device
             logging.info(f"Используется устройство: {device}")
 
             original_texts = "\n".join(job_descriptions)
@@ -145,7 +145,7 @@ class Logic:
 
             gui.show_info("Шаг 1: Классификация и фильтрация предложений...")
             classified_results, filtered_sentences = preprocessor.classify_sentences(
-                filtered_texts.split("\n"), BATCH_SIZE=BATCH_SIZE, exclude_category_label=1
+                filtered_texts.split("\n"), BATCH_SIZE=batch_size, exclude_category_label=1
             )
             logging.debug(f"Классифицировано предложений: {len(classified_results)}")
             gui.update_classification_table(classified_results)
@@ -153,22 +153,22 @@ class Logic:
 
             if device == "cuda":
                 logging.info("Кэш GPU очищен после классификации.")
-                gc.collect() 
-                torch.cuda.empty_cache()  
-        
+                gc.collect()
+                torch.cuda.empty_cache()
+            
             gui.show_info("Шаг 2: Оценка соответствия компетенций...")
             matcher = SkillMatcher(device=device)
-            results = matcher.match_skills(skills, filtered_texts.split("\n"), BATCH_SIZE)
+            results = matcher.match_skills(skills, filtered_texts.split("\n"), batch_size, threshold=threshold) 
             similarity_results = {
                 skill: (score, ctype) for skill, score, ctype in zip(skills, results["sentence_transformer"].values(), competence_types)
             }
-            frequencies = results["frequencies"]  # Сохраняем частоты
+            frequencies = results["frequencies"]
             group_scores = self.calculate_competence_group_scores(skills_with_types, results["sentence_transformer"].values())
             overall_score = self.calculate_overall_score(results["sentence_transformer"])
 
             self.results = {
                 "similarity_results": similarity_results,
-                "frequencies": frequencies,  # Добавляем частоты в результаты
+                "frequencies": frequencies,
                 "group_scores": group_scores,
                 "overall_score": overall_score,
                 "original_texts": original_texts,
@@ -177,7 +177,6 @@ class Logic:
                 "classification_results": classified_results
             }
 
-            #logging.debug(f"Итоговые результаты: {self.results}")
             return self.results
 
         except Exception as e:
@@ -188,11 +187,11 @@ class Logic:
             if hasattr(self, "device") and self.device == "cuda":
                 logging.info("Очистка кэша GPU после завершения анализа...")
                 if "matcher" in locals() and hasattr(matcher, "model"):
-                    matcher.model.to("cpu")  
-                del preprocessor  
-                gc.collect()       
-                torch.cuda.empty_cache()  
-
+                    matcher.model.to("cpu")
+                del preprocessor
+                gc.collect()
+                torch.cuda.empty_cache()
+                
     def export_results_to_excel(self, app):
         """Экспорт результатов анализа в Excel."""
         from tkinter import messagebox
