@@ -1,20 +1,73 @@
 import tkinter as tk
 import numpy as np
-from tkinter import ttk, scrolledtext, messagebox
+from tkinter import ttk, scrolledtext
 import logging
 from moduls.export_to_excel import ExcelExporter
 from moduls.table_sort import sort_treeview_column, sort_competence_type_column  
 from gui.graph_tab import load_graph_program_table  
 
-
 def create_rating_history_tab(frame, app):
     main_frame = tk.Frame(frame)
     main_frame.pack(fill="both", expand=True, pady=5)
 
+    control_frame = tk.Frame(main_frame)
+    control_frame.pack(fill="x", padx=5, pady=5)
+
+    refresh_button = ttk.Button(control_frame, text="Обновить", command=lambda: refresh_history_tables(app))
+    refresh_button.pack(side="left", padx=5, pady=5)
+
+    app.history_use_weights_var = tk.BooleanVar(value=False)
+    use_weights_check = ttk.Checkbutton(control_frame, text="Использовать веса", variable=app.history_use_weights_var, command=lambda: update_group_scores(app))
+    use_weights_check.pack(side="left", padx=5)
+
+    weights_frame = ttk.LabelFrame(control_frame, text="Веса компетенций")
+    weights_frame.pack(side="left", padx=5, pady=5)
+
+    uni_label = ttk.Label(weights_frame, text="Универсальные:")
+    uni_label.pack(side="left", padx=5)
+    app.history_uni_weight_entry = ttk.Entry(weights_frame, width=5)
+    app.history_uni_weight_entry.insert(0, "0.2")
+    app.history_uni_weight_entry.pack(side="left", padx=5)
+
+    gen_label = ttk.Label(weights_frame, text="Общепроф.:")
+    gen_label.pack(side="left", padx=5)
+    app.history_gen_weight_entry = ttk.Entry(weights_frame, width=5)
+    app.history_gen_weight_entry.insert(0, "0.4")
+    app.history_gen_weight_entry.pack(side="left", padx=5)
+
+    prof_label = ttk.Label(weights_frame, text="Проф.:")
+    prof_label.pack(side="left", padx=5)
+    app.history_prof_weight_entry = ttk.Entry(weights_frame, width=5)
+    app.history_prof_weight_entry.insert(0, "0.4")
+    app.history_prof_weight_entry.pack(side="left", padx=5)
+
+    app.export_history_button = tk.Button(control_frame, text="Экспорт в Excel", command=lambda: export_history_to_excel(app))
+    app.export_history_button.pack(side=tk.LEFT, padx=5)
+    app.delete_history_button = tk.Button(control_frame, text="Удалить", command=lambda: delete_assessment_table(app))
+    app.delete_history_button.pack(side=tk.LEFT, padx=5)
+
+    def validate_weight(value):
+        if value == "":
+            return True
+        try:
+            val = float(value)
+            return 0 <= val <= 1
+        except ValueError:
+            return False
+
+    wcmd = (frame.register(validate_weight), '%P')
+    app.history_uni_weight_entry.configure(validate="key", validatecommand=wcmd)
+    app.history_gen_weight_entry.configure(validate="key", validatecommand=wcmd)
+    app.history_prof_weight_entry.configure(validate="key", validatecommand=wcmd)
+
+    app.history_uni_weight_entry.bind("<FocusOut>", lambda event: update_group_scores(app))
+    app.history_gen_weight_entry.bind("<FocusOut>", lambda event: update_group_scores(app))
+    app.history_prof_weight_entry.bind("<FocusOut>", lambda event: update_group_scores(app))
+
     program_vacancy_frame = tk.LabelFrame(main_frame, text="Образовательная программа и оцениваемая вакансия")
     program_vacancy_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-    app.program_vacancy_history_table = ttk.Treeview(program_vacancy_frame, columns=("educational_program", "university", "year", "vacancy", "assessment_date"), show="headings",height=6)
+    app.program_vacancy_history_table = ttk.Treeview(program_vacancy_frame, columns=("educational_program", "university", "year", "vacancy", "assessment_date"), show="headings", height=6)
     app.program_vacancy_history_table.heading("educational_program", text="Образовательная программа", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "educational_program", False))
     app.program_vacancy_history_table.heading("university", text="ВУЗ", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "university", False))
     app.program_vacancy_history_table.heading("year", text="Год", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "year", False))
@@ -47,13 +100,6 @@ def create_rating_history_tab(frame, app):
     app.group_scores_history_frame = scrolledtext.ScrolledText(group_scores_frame, width=120, height=8)
     app.group_scores_history_frame.pack(pady=4)
 
-    export_frame = tk.Frame(main_frame)
-    export_frame.pack(pady=4, fill="both", expand=False)
-    app.export_history_button = tk.Button(export_frame, text="Экспорт в Excel", command=lambda: export_history_to_excel(app))
-    app.export_history_button.pack(side=tk.LEFT, padx=5)
-    app.delete_history_button = tk.Button(export_frame, text="Удалить", command=lambda: delete_assessment_table(app))
-    app.delete_history_button.pack(side=tk.LEFT, padx=5)
-
     load_program_vacancy_history_table(app)
 
 def export_history_to_excel(app):
@@ -84,6 +130,7 @@ def export_history_to_excel(app):
         logging.error(f"Ошибка экспорта: {e}", exc_info=True)
 
 def load_program_vacancy_history_table(app):
+    """Загрузка истории программ и вакансий."""
     try:
         app.program_vacancy_history_table.delete(*app.program_vacancy_history_table.get_children())
         rows = app.logic.db.fetch_program_vacancy_history()
@@ -96,7 +143,6 @@ def load_program_vacancy_history_table(app):
         if app.program_vacancy_history_table.get_children():
             app.program_vacancy_history_table.selection_set(app.program_vacancy_history_table.get_children()[0])
             update_competence_history_table(app)
-            update_group_scores(app)
     except Exception as e:
         app.show_error(f"Ошибка при загрузке данных: {e}")
         logging.error(f"Ошибка загрузки данных из assessment: {e}", exc_info=True)
@@ -123,7 +169,7 @@ def update_competence_history_table(app):
         logging.error(f"Ошибка обновления таблицы компетенций: {e}", exc_info=True)
 
 def update_group_scores(app):
-    """Обновление оценок групп компетенций и общей оценки."""
+    """Обновление оценок групп компетенций и общей оценки с учетом весов."""
     selected_item = app.program_vacancy_history_table.selection()
     if not selected_item:
         app.group_scores_history_frame.delete(1.0, tk.END)
@@ -145,12 +191,32 @@ def update_group_scores(app):
             group_scores.setdefault(type_competence, []).append(float(score))
 
         group_averages = {ctype: np.mean(scores) for ctype, scores in group_scores.items()}
-        overall_score = np.mean([score for scores in group_scores.values() for score in scores])
+
+        if app.history_use_weights_var.get():
+            weights = {
+                "Универсальная компетенция": float(app.history_uni_weight_entry.get() or "0.2"),
+                "Общепрофессиональная компетенция": float(app.history_gen_weight_entry.get() or "0.4"),
+                "Профессиональная компетенция": float(app.history_prof_weight_entry.get() or "0.4")
+            }
+            total_weight = sum(weights.values())
+            if not abs(total_weight - 1.0) < 1e-6:
+                app.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight:.2f}")
+                return
+            for key, val in weights.items():
+                if not (0 <= val <= 1):
+                    app.show_error(f"Вес для {key} должен быть от 0 до 1!")
+                    return
+            overall_score, weighted_group_scores = app.logic.calculate_overall_score(group_averages, True, weights)
+        else:
+            overall_score, weighted_group_scores = app.logic.calculate_overall_score(group_averages, False, None)
+            weighted_group_scores = group_averages  # Невзвешенные оценки
 
         app.group_scores_history_frame.insert(tk.END, "Оценки групп компетенций:\n")
-        for ctype, avg_score in group_averages.items():
+        for ctype, avg_score in weighted_group_scores.items():
             app.group_scores_history_frame.insert(tk.END, f"{ctype}: {avg_score:.6f}\n")
         app.group_scores_history_frame.insert(tk.END, f"\nОбщая оценка программы: {overall_score:.6f}\n")
+    except ValueError:
+        app.show_error("Введите корректные числовые значения для весов (от 0 до 1)!")
     except Exception as e:
         app.show_error(f"Ошибка обновления оценок: {e}")
         logging.error(f"Ошибка обновления оценок групп: {e}", exc_info=True)
@@ -161,7 +227,6 @@ def refresh_history_tables(app):
     selected_item = app.program_vacancy_history_table.selection()
     if selected_item:
         update_competence_history_table(app)
-        update_group_scores(app)
 
 def delete_assessment_table(app):
     """Удаление выбранной записи из таблицы assessment."""
@@ -175,7 +240,6 @@ def delete_assessment_table(app):
         logging.error(f"Ошибка: Неверное количество значений в строке: ожидалось 5, получено {len(values)}: {values}")
         return
 
-    # Извлекаем только нужные поля для удаления из базы данных
     educational_program_name = values[0]  # educational_program
     vacancy_name = values[3]            # vacancy
     assessment_date = values[4]         # assessment_date
@@ -183,7 +247,6 @@ def delete_assessment_table(app):
     try:
         logging.info(f"Попытка удалить запись: {educational_program_name}, {vacancy_name}, {assessment_date}")
         if app.logic.db.delete_assessment(educational_program_name, vacancy_name, assessment_date):
-            # Удаляем строку из таблицы интерфейса (все столбцы, включая university и year)
             app.program_vacancy_history_table.delete(selected_item[0])
             app.group_scores_history_frame.delete(1.0, tk.END)
             app.refresh_graph_table()  # Обновляем таблицу на вкладке "Графики"

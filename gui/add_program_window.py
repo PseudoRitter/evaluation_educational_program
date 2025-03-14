@@ -36,25 +36,30 @@ def load_tables(app):
     programs_data = [(p[0], p[1], p[2] or "", p[3], p[4]) for p in app.programs]
     load_table(app.program_table, programs_data)
 
-    if hasattr(app, "last_selected_program_data") and app.last_selected_program_data:
-        name, code, university_short = app.last_selected_program_data
+    # Восстанавливаем выбор программы по четырем полям
+    if getattr(app, "last_selected_program_data", None) and len(app.last_selected_program_data) == 4:
+        logging.debug(f"Попытка восстановить выбор: {app.last_selected_program_data}")
+        name, code, year, university_short = app.last_selected_program_data
+        found = False
         for item in app.program_table.get_children():
             values = app.program_table.item(item)["values"]
-            if values[0] == name and values[1] == code and values[3] == university_short:
+            logging.debug(f"Проверка строки: {values}")
+            if (values[0] == name and values[1] == code and 
+                values[2] == year and values[3] == university_short):
                 app.program_table.selection_set(item)
                 app.program_table.focus(item)
-                on_program_table_select(app)  # Обновляем компетенции для выбранной программы
+                on_program_table_select(app)  # Обновляем компетенции
+                logging.debug(f"Выбор восстановлен на: {values}")
+                found = True
                 break
+        if not found:
+            logging.warning(f"Программа не найдена: {app.last_selected_program_data}")
+            app.competence_table_add.delete(*app.competence_table_add.get_children())
+            app.add_window_selected_program_label.config(text="Выбрана программа: Нет")
     else:
-        # Если выбора не было, очищаем таблицу компетенций
+        logging.debug(f"Нет данных для восстановления или неверный формат: last_selected_program_data={getattr(app, 'last_selected_program_data', None)}")
         app.competence_table_add.delete(*app.competence_table_add.get_children())
-
-    competences = (
-        app.logic.db.fetch_competences_for_program(app.selected_program_id)
-        if hasattr(app, "selected_program_id")
-        else []
-    )
-    load_table(app.competence_table_add, competences)
+        app.add_window_selected_program_label.config(text="Выбрана программа: Нет")
     
 def load_table(table, data):
     """Универсальная загрузка данных в Treeview."""
@@ -171,10 +176,10 @@ def on_program_table_select(app):
     program_id = app.logic.db.fetch_program_id_by_name_and_code(name, code, year, university_id)
 
     if program_id:
-        app.temp_selected_program = (name, code)
         app.add_window_selected_program_label.config(text=f"Выбрана программа: {name}")
         app.selected_program_id = program_id[0]
-        app.last_selected_program_data = (name, code)  # Сохраняем данные выбранной программы
+        app.last_selected_program_data = (name, code, year, university_short)
+        logging.debug(f"Выбрана программа: {app.last_selected_program_data}")
 
         try:
             competences = app.logic.db.fetch_competences_for_program(app.selected_program_id)
@@ -234,9 +239,9 @@ def edit_entity_window(app, parent_window, entity_type, action):
     selected_program = app.program_table.selection()
     if selected_program:
         values = app.program_table.item(selected_program[0])["values"]
-        app.last_selected_program_data = (values[0], values[1])
-    else:
-        app.last_selected_program_data = None
+        app.last_selected_program_data = (values[0], values[1], values[2], values[3])  # Используем все 4 поля
+        logging.debug(f"Обновлено last_selected_program_data в edit_entity_window: {app.last_selected_program_data}")
+    # else: не сбрасываем last_selected_program_data, оставляем как есть
 
     window = tk.Toplevel(parent_window)
     window.title(f"{action.capitalize()} {config['title']}")
@@ -264,7 +269,6 @@ def edit_entity_window(app, parent_window, entity_type, action):
                 entry.insert("1.0", value)
 
     tk.Button(window, text="Сохранить", command=lambda: save_entity(app, window, parent_window, entity_type, action, entries, old_values if action == "edit" else None)).pack(pady=5)
-
 def remove_newlines(text_widget):
     """Удаление символов новой строки из текста."""
     try:
@@ -289,14 +293,40 @@ def save_entity(app, window, parent_window, entity_type, action, entries, old_va
             save_program(app, values, old_values, action)
         elif entity_type == "competence":
             save_competence(app, values, old_values, action)
+        
         window.destroy()
+        
+        # После сохранения обновляем таблицы и восстанавливаем выбор программы
         if entity_type == "program":
-            from .education_tab import sync_program_tables  # Локальный импорт
+            from .education_tab import sync_program_tables
             sync_program_tables(app)
         else:
             load_tables(app)
+            
+        # Если добавляли компетенцию, восстанавливаем выбор программы
+        if (entity_type == "competence" and 
+            hasattr(app, "selected_program_id") and 
+            getattr(app, "last_selected_program_data", None) is not None and 
+            len(app.last_selected_program_data) == 4):
+            programs = app.logic.db.fetch_educational_programs_with_details()
+            logging.debug(f"Восстановление selected_program_id: {app.last_selected_program_data}")
+            name, code, year, university_short = app.last_selected_program_data
+            for program in programs:
+                if (program[0] == name and 
+                    program[1] == code and 
+                    program[2] == year and 
+                    program[3] == university_short):
+                    university_id = app.logic.db.fetch_university_by_short_name(program[3])[0]
+                    program_id = app.logic.db.fetch_program_id_by_name_and_code(program[0], program[1], program[2], university_id)
+                    if program_id:
+                        app.selected_program_id = program_id[0]
+                        logging.debug(f"Установлен selected_program_id: {app.selected_program_id}")
+                        break
+            else:
+                logging.warning(f"Программа не найдена в базе для восстановления: {app.last_selected_program_data}")
     except Exception as e:
         logging.error(f"Ошибка сохранения {entity_type}: {e}")
+        # Не закрываем окно, чтобы пользователь мог исправить ошибку
 
 def save_university(app, values, old_values, action):
     """Сохранение данных университета."""
@@ -352,23 +382,45 @@ def save_competence(app, values, old_values, action):
         logging.error(f"Тип компетенции '{type_name}' не найден!")
         return
 
-    if action == "add":
-        competence = app.logic.db.fetch_competence_by_name(competence_name)
-        competence_id = app.logic.db.save_competence(competence_name, type_id) if not competence else competence[0]
-        if app.logic.db.save_competence_for_program(competence_id, type_id, app.selected_program_id):
-            logging.info(f"Компетенция '{competence_name}' добавлена!")
-    else:
-        old_competence_name = old_values[0]
-        old_competence = app.logic.db.fetch_competence_by_name(old_competence_name)
-        if not old_competence:
-            logging.error(f"Компетенция '{old_competence_name}' не найдена!")
-            return
-        competence_id = old_competence[0]
-        if app.logic.db.update_competence(competence_id, competence_name, type_id):
-            if app.logic.db.update_competence_for_program(competence_id, old_competence[2], app.selected_program_id, competence_id, type_id):
-                logging.info(f"Компетенция '{competence_name}' обновлена!")
+    conn = app.logic.db.get_connection()
+    try:
+        with conn.cursor() as cursor:
+            if action == "add":
+                competence = app.logic.db.fetch_competence_by_name(competence_name)
+                competence_id = app.logic.db.save_competence(competence_name, type_id) if not competence else competence[0]
+                cursor.execute("""
+                    INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
+                    VALUES (%s, %s, %s);
+                """, (competence_id, type_id, app.selected_program_id))
+                logging.info(f"Компетенция '{competence_name}' добавлена!")
             else:
-                logging.error("Ошибка обновления связи компетенции с программой!")
+                old_competence_name = old_values[0]
+                old_competence = app.logic.db.fetch_competence_by_name(old_competence_name)
+                if not old_competence:
+                    logging.error(f"Компетенция '{old_competence_name}' не найдена!")
+                    return
+                competence_id = old_competence[0]
+                cursor.execute("""
+                    UPDATE competence
+                    SET competence_name = %s, type_competence_id = %s
+                    WHERE competence_id = %s;
+                """, (competence_name, type_id, competence_id))
+                cursor.execute("""
+                    DELETE FROM competence_educational_program 
+                    WHERE competence_id = %s AND type_competence_id = %s AND educational_program_id = %s;
+                """, (competence_id, old_competence[2], app.selected_program_id))
+                cursor.execute("""
+                    INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
+                    VALUES (%s, %s, %s);
+                """, (competence_id, type_id, app.selected_program_id))
+                logging.info(f"Компетенция '{competence_name}' обновлена!")
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logging.error(f"Ошибка при сохранении компетенции: {e}")
+        raise  # Повторно вызываем исключение, чтобы `save_entity` обработал его
+    finally:
+        app.logic.db.release_connection(conn)
 
 def delete_entity(app, parent_window, entity_type):
     """Удаление сущности из базы данных."""

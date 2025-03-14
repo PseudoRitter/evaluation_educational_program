@@ -11,12 +11,7 @@ def create_education_tab(frame, app):
     education_table_frame = ttk.LabelFrame(education_program_frame, text="Выбор программы")
     education_table_frame.pack(pady=4, padx=4, fill="both", expand=False)
 
-    app.education_table = ttk.Treeview(
-        education_table_frame,
-        columns=("name", "code", "year", "university_short", "type"),
-        show="headings",
-        height=8
-    )
+    app.education_table = ttk.Treeview(education_table_frame, columns=("name", "code", "year", "university_short", "type"),show="headings", height=8)
     app.education_table.heading("name", text="Наименование ОП", command=lambda: sort_treeview_column(app.education_table, "name", False))
     app.education_table.heading("code", text="Код ОП", command=lambda: sort_treeview_column(app.education_table, "code", False))
     app.education_table.heading("year", text="Год ОП", command=lambda: sort_treeview_column(app.education_table, "year", False))
@@ -30,11 +25,14 @@ def create_education_tab(frame, app):
     app.education_table.pack(pady=4, fill="x", expand=False)
     app.education_table.bind("<<TreeviewSelect>>", lambda event: preview_competences(app))
 
-    app.select_button = tk.Button(frame, text="Выбрать", command=lambda: on_table_select(app))
-    app.select_button.pack(pady=4)
+    education_program_select_frame = tk.Frame(frame)
+    education_program_select_frame.pack(pady=4, fill="x", expand=False)
 
-    app.selected_program_label = tk.Label(frame, text="Выбрана программа: Нет")
-    app.selected_program_label.pack(pady=4)
+    app.select_button = tk.Button(education_program_select_frame, text="Выбрать", command=lambda: on_table_select(app))
+    app.select_button.pack(padx=5, pady=5)
+
+    app.selected_program_label = tk.Label(education_program_select_frame, text="Выбрана программа: Нет")
+    app.selected_program_label.pack(padx=5, pady=5)
 
     app.competence_frame = ttk.LabelFrame(frame, text="Компетенции программы")
     app.competence_frame.pack(pady=4, padx=4, fill="both", expand=False)
@@ -46,9 +44,8 @@ def create_education_tab(frame, app):
     app.competence_table.column("competence_type", width=80)
     app.competence_table.pack(pady=4, fill="both", expand=False)
 
-    # Кнопка добавления программы
     app.add_program_button = tk.Button(frame, text="Добавить программу", command=lambda: create_add_program_window(app.root, app))
-    app.add_program_button.pack(pady=10)
+    app.add_program_button.pack(padx=5, pady=5)
 
     configure_treeview_style()
     load_education_table(app)

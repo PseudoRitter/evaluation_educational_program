@@ -2,7 +2,7 @@ import tkinter as tk
 import logging
 from gui.app import App
 from logic import Logic
-
+3
 def configure_logging():
     logging.basicConfig(
         level=logging.DEBUG,

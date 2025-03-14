@@ -16,12 +16,7 @@ def create_vacancies_tab(frame, app):
     vacancies_frame = ttk.LabelFrame(container_frame, text="Вакансии с сайта")
     vacancies_frame.pack(side=tk.LEFT, pady=5, padx=5, fill="both", expand=True)
 
-    app.vacancies_table = ttk.Treeview(
-        vacancies_frame,
-        columns=("id", "name", "quantity", "collection_date", "file"),
-        show="headings",
-        height=10
-    )
+    app.vacancies_table = ttk.Treeview(vacancies_frame, columns=("id", "name", "quantity", "collection_date", "file"), show="headings", height=17)
     app.vacancies_table.heading("id", text="ID")
     app.vacancies_table.heading("name", text="Название вакансии", command=lambda: sort_treeview_column(app.vacancies_table, "name", False))
     app.vacancies_table.heading("quantity", text="Количество вакансий", command=lambda: sort_treeview_column(app.vacancies_table, "quantity", False))
@@ -54,6 +49,11 @@ def create_vacancies_tab(frame, app):
     app.search_query_entry.pack(side=tk.LEFT, padx=5)
     tk.Button(search_vacancies_frame, text="Поиск вакансий", command=lambda: start_search(app)).pack(side=tk.LEFT, padx=5)
 
+    # Добавляем скрытый Label для прогресса
+    app.progress_label = tk.Label(frame, text="")
+    app.progress_label.pack(pady=5)
+    app.progress_label.pack_forget()  # Скрываем изначально
+
     load_vacancies_table(app)
 
 def start_search(app):
@@ -63,21 +63,43 @@ def start_search(app):
         return
 
     app.show_info("Поиск вакансий начат...")
+    app.progress_label.config(text="Прогресс сбора вакансий: Инициализация... 0% (0/0)")
+    app.progress_label.pack()  # Показываем прогресс
 
     def callback(future):
         try:
-            vacancy_id = future.result() 
+            vacancy_id = future.result()
             if vacancy_id:
-                app.root.after(0, lambda: load_vacancies_table(app)) 
+                app.root.after(0, lambda: load_vacancies_table(app))
                 app.show_info(f"Вакансии сохранены (ID: {vacancy_id})")
             else:
                 app.show_error("Ошибка сохранения в БД!")
         except Exception as e:
             app.show_error(f"Ошибка сбора вакансий: {e}")
             logging.error(f"Ошибка в callback поиска вакансий: {e}")
+        finally:
+            app.root.after(0, lambda: app.progress_label.pack_forget())  # Скрываем прогресс после завершения
 
     future = app.vac_executor.submit(search_vacancies, app)
     future.add_done_callback(callback)
+
+    # Запускаем обновление прогресса
+    app.root.after(100, lambda: update_progress(app))
+
+def update_progress(app):
+    if hasattr(app, "labor_market_instance") and app.labor_market_instance:
+        total = len(app.labor_market_instance.vacancies)
+        current = len(app.labor_market_instance.temp)
+        if total > 0:
+            percentage = (current / total) * 100
+            progress_text = f"Прогресс сбора вакансий: {app.search_query_entry.get()} {percentage:.1f}% ({current}/{total})"
+            app.progress_label.config(text=progress_text)
+        else:
+            app.progress_label.config(text="Прогресс сбора вакансий: Сбор данных... 0% (0/0)")
+        
+        # Продолжаем обновление каждые 100 мс, если процесс еще идет
+        if app.vac_executor._threads:  # Проверяем, что поток еще активен
+            app.root.after(100, lambda: update_progress(app))
 
 def search_vacancies(app):
     query = app.search_query_entry.get().strip()
@@ -87,19 +109,20 @@ def search_vacancies(app):
 
     ACCESS_TOKEN = "APPLRDK45780T0N5LTCCGEC9DU19NPGSORRJP5535R95VETEF4203PHSQI97V49C"
     hh_data = LaborMarketData(query=query, access_token=ACCESS_TOKEN)
+    app.labor_market_instance = hh_data  # Сохраняем экземпляр в app
     try:
         hh_data.collect_all_vacancies()
-        current_date_time = datetime.now().strftime("%Y-%m-%d %H-%M")  
-        filename = f"{query} {current_date_time}.json" 
+        current_date_time = datetime.now().strftime("%Y-%m-%d %H-%M")
+        filename = f"{query} {current_date_time}.json"
         full_path = f"vacancies_hh/{filename}"
 
         os.makedirs("vacancies_hh", exist_ok=True)
         
-        hh_data.save_to_json(full_path)  
+        hh_data.save_to_json(full_path)
 
         vacancy_id = app.logic.db.save_vacancy(query, len(hh_data.vacancies), current_date_time, filename)
         if vacancy_id:
-            return vacancy_id  
+            return vacancy_id
         else:
             app.show_error("Ошибка сохранения в БД!")
             return None
@@ -107,6 +130,8 @@ def search_vacancies(app):
         app.show_error(f"Ошибка сбора вакансий: {e}")
         logging.error(f"Ошибка сбора вакансий '{query}': {e}")
         return None
+    finally:
+        app.labor_market_instance = None  # Очищаем после завершения
 
 def on_vacancy_select(app):
     selected_item = app.vacancies_table.selection()

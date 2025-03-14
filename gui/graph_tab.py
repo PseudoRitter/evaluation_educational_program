@@ -492,11 +492,12 @@ def plot_frequency_histogram(window, competences, frequencies):
     for bar, freq in zip(bars, freq_values):
         width = bar.get_width()  # Длина столбца
         y_pos = bar.get_y() + bar.get_height() / 2  # Центр столбца по вертикали
+        ax.text(width, y_pos, str(freq), ha="left", va="center", fontsize=10)
         # Если столбец слишком короткий (< 5), размещаем значение справа, иначе внутри
-        if width < 5:
-            ax.text(width, y_pos, str(freq), ha="left", va="center", fontsize=8)
-        else:
-            ax.text(width, y_pos, str(freq), ha="right", va="center", fontsize=8, color="white")
+        # if width < 5:
+        #     ax.text(width, y_pos, str(freq), ha="left", va="center", fontsize=10)
+        # else:
+        #     ax.text(width, y_pos, str(freq), ha="right", va="center", fontsize=10, color="white")
 
     # Создаем легенду
     from matplotlib.patches import Patch

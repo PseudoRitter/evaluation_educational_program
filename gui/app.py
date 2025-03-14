@@ -19,6 +19,7 @@ class App:
         """Инициализация приложения с главным окном и логикой."""
         self.root = root
         self.logic = logic
+        self.last_selected_program_data = None
         self.root.title("Оценка соответствия образовательной программы")
         self.root.geometry("1100x800")
         self.program_id = None
@@ -26,7 +27,6 @@ class App:
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.create_widgets()
         self.load_initial_data()
-        
 
     def create_widgets(self):
         self.notebook = ttk.Notebook(self.root)
@@ -52,7 +52,7 @@ class App:
         self.notebook.add(self.rating_history_tab, text="История оценок")
         create_rating_history_tab(self.rating_history_tab, self)
 
-        self.graph_tab = ttk.Frame(self.notebook)  # Новая вкладка
+        self.graph_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.graph_tab, text="Графики")
         create_graph_tab(self.graph_tab, self)
 
@@ -85,27 +85,41 @@ class App:
             self.show_error(f"Не удалось загрузить вакансии: {e}")
 
     def start_analysis(self):
-        """Запуск анализа соответствия программы и вакансии с учетом порогового значения."""
+        """Запуск анализа соответствия программы и вакансии с учетом весов."""
         if not self.program_id or not self.selected_vacancy_id:
             self.show_error("Выберите образовательную программу и вакансию перед запуском анализа!")
             return
 
         try:
-            # Получаем пороговое значение из поля ввода
             threshold_str = self.threshold_entry.get()
             threshold = float(threshold_str) if threshold_str.strip() else 0.5
             if not (0 <= threshold <= 1):
                 self.show_error("Пороговое значение должно быть от 0 до 1!")
                 return
 
-            logging.debug(f"Запуск анализа с порогом: {threshold}")
-            self.show_info("Запуск анализа...")
+            use_weights = self.use_weights_var.get()
+            weights = None
+            if use_weights:
+                weights = {
+                    "Универсальная компетенция": float(self.uni_weight_entry.get() or "0.2"),
+                    "Общепрофессиональная компетенция": float(self.gen_weight_entry.get() or "0.4"),
+                    "Профессиональная компетенция": float(self.prof_weight_entry.get() or "0.4")
+                }
+                total_weight = sum(weights.values())
+                if not abs(total_weight - 1.0) < 1e-6:
+                    self.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight:.2f}")
+                    return
+                for key, val in weights.items():
+                    if not (0 <= val <= 1):
+                        self.show_error(f"Вес для {key} должен быть от 0 до 1!")
+                        return
 
-            # Запускаем анализ в отдельном потоке с передачей threshold
-            future = self.executor.submit(self.logic.run_analysis, self.program_id, self.selected_vacancy_id, self, BATCH_SIZE, threshold)
+            logging.debug(f"Запуск анализа с порогом: {threshold}, использование весов: {use_weights}, веса: {weights}")
+            self.show_info("Запуск анализа...")
+            future = self.executor.submit(self.logic.run_analysis, self.program_id, self.selected_vacancy_id, self, BATCH_SIZE, threshold, use_weights, weights)
             future.add_done_callback(self.on_analysis_complete)
         except ValueError:
-            self.show_error("Введите корректное числовое значение порога (от 0 до 1)!")
+            self.show_error("Введите корректные числовые значения для порога и весов (от 0 до 1)!")
         except Exception as e:
             logging.error(f"Ошибка при запуске анализа: {e}", exc_info=True)
             self.show_error(f"Ошибка при запуске анализа: {e}")
@@ -128,18 +142,38 @@ class App:
         logging.info(f"GUI Info: {message}")
 
     def update_results(self, results):
+        """Обновление результатов с учетом текущих весов."""
         try:
-            self.result_text_area.delete(1.0, tk.END)
             self.skill_results_table.delete(*self.skill_results_table.get_children())
             self.group_scores_area.delete(1.0, tk.END)
 
             for skill, (score, ctype) in results["similarity_results"].items():
                 self.skill_results_table.insert("", tk.END, values=(skill, ctype, f"{score:.6f}"))
 
+            use_weights = self.use_weights_var.get()
+            weights = None
+            if use_weights:
+                weights = {
+                    "Универсальная компетенция": float(self.uni_weight_entry.get() or "0.2"),
+                    "Общепрофессиональная компетенция": float(self.gen_weight_entry.get() or "0.4"),
+                    "Профессиональная компетенция": float(self.prof_weight_entry.get() or "0.4")
+                }
+                total_weight = sum(weights.values())
+                if not abs(total_weight - 1.0) < 1e-6:
+                    self.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight:.2f}")
+                    return
+                for key, val in weights.items():
+                    if not (0 <= val <= 1):
+                        self.show_error(f"Вес для {key} должен быть от 0 до 1!")
+                        return
+            overall_score, weighted_group_scores = self.logic.calculate_overall_score(results["group_scores"], use_weights, weights)
+
             self.group_scores_area.insert(tk.END, "Оценки групп компетенций:\n")
-            for ctype, score in results["group_scores"].items():
+            for ctype, score in (weighted_group_scores if use_weights else results["group_scores"]).items():
                 self.group_scores_area.insert(tk.END, f"{ctype}: {score:.6f}\n")
-            self.group_scores_area.insert(tk.END, f"\nОбщая оценка программы: {results['overall_score']:.6f}\n")
+            self.group_scores_area.insert(tk.END, f"\nОбщая оценка программы: {overall_score:.6f}\n")
+        except ValueError:
+            self.show_error("Введите корректные числовые значения для весов (от 0 до 1)!")
         except Exception as e:
             logging.error(f"Ошибка обновления результатов: {e}", exc_info=True)
             self.show_error(f"Ошибка обновления: {e}")

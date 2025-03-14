@@ -78,8 +78,24 @@ class Logic:
             group_scores.setdefault(ctype, []).append(score)
         return {ctype: np.mean(scores) if scores else 0.0 for ctype, scores in group_scores.items()}
 
-    def calculate_overall_score(self, similarity_scores):
-        return np.mean(list(similarity_scores.values())) if similarity_scores else 0.0
+    def calculate_overall_score(self, group_scores, use_weights, weights):
+        """Расчет общей оценки и взвешенных групповых оценок с учетом весов."""
+        if not group_scores:
+            return 0.0, {}
+
+        if not use_weights:
+            return np.mean(list(group_scores.values())) if group_scores else 0.0, group_scores
+
+        # Взвешенные групповые оценки
+        weighted_group_scores = {}
+        overall_score = 0.0
+        for ctype, score in group_scores.items():
+            weight = weights.get(ctype, 0.0)  # Если вес не указан, = 0
+            weighted_score = score * weight
+            weighted_group_scores[ctype] = weighted_score
+            overall_score += weighted_score
+
+        return overall_score, weighted_group_scores
 
     def load_vacancy_descriptions_field(self, full_path):
         try:
@@ -90,7 +106,8 @@ class Logic:
             logging.error(f"Ошибка загрузки описаний из {full_path}: {e}")
             return []
 
-    def run_analysis(self, program_id, vacancy_id, gui, batch_size, threshold=0.5):
+    def run_analysis(self, program_id, vacancy_id, gui, batch_size, threshold=0.5, use_weights=False, weights=None):
+        """Запуск анализа соответствия программы и вакансий с учетом весов."""
         try:
             vacancy = self.db.fetch_vacancy_details(vacancy_id)
             if not vacancy:
@@ -158,13 +175,17 @@ class Logic:
             
             gui.show_info("Шаг 2: Оценка соответствия компетенций...")
             matcher = SkillMatcher(device=device)
-            results = matcher.match_skills(skills, filtered_texts.split("\n"), batch_size, threshold=threshold) 
+            results = matcher.match_skills(skills, filtered_texts.split("\n"), batch_size, threshold)
             similarity_results = {
                 skill: (score, ctype) for skill, score, ctype in zip(skills, results["sentence_transformer"].values(), competence_types)
             }
             frequencies = results["frequencies"]
             group_scores = self.calculate_competence_group_scores(skills_with_types, results["sentence_transformer"].values())
-            overall_score = self.calculate_overall_score(results["sentence_transformer"])
+            overall_score = self.calculate_overall_score(group_scores, use_weights, weights or {
+                "Универсальная компетенция": 0.2,
+                "Общепрофессиональная компетенция": 0.4,
+                "Профессиональная компетенция": 0.4
+            })
 
             self.results = {
                 "similarity_results": similarity_results,
@@ -191,14 +212,8 @@ class Logic:
                 del preprocessor
                 gc.collect()
                 torch.cuda.empty_cache()
-                
-    def export_results_to_excel(self, app):
-        """Экспорт результатов анализа в Excel."""
-        from tkinter import messagebox
-        if not self.results:
-            messagebox.showerror("Ошибка", "Нет данных для экспорта!")
-            return
 
+    def export_results_to_excel(self, app):
         selected_program = app.selected_program_label.cget("text").replace("Выбрана программа: ", "")
         selected_vacancy = app.selected_vacancy_label.cget("text").replace("Выбрана вакансия: ", "")
         
