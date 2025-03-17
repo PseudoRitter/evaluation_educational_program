@@ -85,7 +85,7 @@ def fine_tune_model(train_df, eval_df, output_dir="C:/python-models/fine_tuned_m
         evaluation_strategy="epoch",
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
-        num_train_epochs=3,
+        num_train_epochs=5,
         weight_decay=0.01,
         logging_dir="./logs",
         logging_steps=10,
@@ -114,7 +114,7 @@ def fine_tune_model(train_df, eval_df, output_dir="C:/python-models/fine_tuned_m
 # Основной скрипт
 if __name__ == "__main__":
     # Путь к файлу с данными
-    file_path = "training models/data_deeppavlov.csv" # Укажите путь к вашему CSV файлу
+    file_path = "training models/deeppavlov_train.csv" # Укажите путь к вашему CSV файлу
     
     # Проверка существования файла
     if not os.path.exists(file_path):

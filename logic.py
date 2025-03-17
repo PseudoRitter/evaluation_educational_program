@@ -5,6 +5,8 @@ import gc
 import logging
 import os
 import json
+import tkinter as tk
+from tkinter import  messagebox
 from moduls.database import Database
 from moduls.export_to_excel import ExcelExporter
 from moduls.skill_matcher import SkillMatcher
@@ -212,6 +214,9 @@ class Logic:
                 del preprocessor
                 gc.collect()
                 torch.cuda.empty_cache()
+        
+            tk.messagebox.showinfo(title="Информация", message="Оценка завершена!")
+
 
     def export_results_to_excel(self, app):
         selected_program = app.selected_program_label.cget("text").replace("Выбрана программа: ", "")

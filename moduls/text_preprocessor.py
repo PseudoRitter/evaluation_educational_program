@@ -3,10 +3,13 @@ import torch
 import numpy as np
 import gc
 import logging
+import spacy
 import os
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 BATCH_SIZE = 64
+
+# nlp = spacy.load("ru_core_news_sm")
 
 class TextPreprocessor:
     def __init__(self, model_path="C:/python-models/fine_tuned_model_v4"):
@@ -65,12 +68,23 @@ class TextPreprocessor:
             logging.error(f"Ошибка сегментации: {e}", exc_info=True)
             return []
 
-    def filter_short_sentences(self, sentences, min_words=3):
+    # def segment_text(self, text):
+    #     try:
+    #         # Обработка текста с помощью spaCy
+    #         doc = nlp(text)
+    #         # Извлечение предложений и удаление лишних пробелов
+    #         return [sent.text.strip() for sent in doc.sents if sent.text.strip()]
+    #     except Exception as e:
+    #         logging.error(f"Ошибка сегментации: {e}", exc_info=True)
+    #         return []
+        
+    def filter_short_sentences(self, sentences, min_words=0):
         try:
             return [s for s in sentences if s.strip() and len(s.split()) >= min_words]
         except Exception as e:
             logging.error(f"Ошибка фильтрации: {e}", exc_info=True)
             return []
+
 
     def filter_sentences(self, sentences):
         return [s[:512] for s in sentences]

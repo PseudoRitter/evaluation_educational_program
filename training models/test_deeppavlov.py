@@ -11,12 +11,13 @@ print(f"Using device: {device}")
 
 # 2. Загрузка модели и токенизатора
 model_path = "C:/python-models/fine_tuned_model_v4"
+#model_path = "DeepPavlov/rubert-base-cased-sentence"
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 model = AutoModelForSequenceClassification.from_pretrained(model_path)
 model.to(device)  # Перемещение модели на GPU (если доступно)
 
 # 3. Чтение данных из CSV
-csv_file = "training models/test_deeppavlov.csv"  # Укажите имя вашего файла
+csv_file = "training models/deeppavlov_test.csv"  # Укажите имя вашего файла
 data = pd.read_csv(csv_file)
 sentences = data["sentence"].tolist()  # Исправьте на "sentence", если в файле нет опечатки
 true_labels = data["label"].tolist()
