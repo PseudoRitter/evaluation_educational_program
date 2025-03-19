@@ -5,7 +5,7 @@ import gc
 import numpy as np
 
 class SkillMatcher:
-    def __init__(self, device="cpu", model_path="C:/python-models/tuned_model_mpnet_v1"):
+    def __init__(self, device="cpu", model_path="C:/python-models/tuned_model_mpnet_v2"):
         self.device = device
         self.model_path = model_path
         self.model = None

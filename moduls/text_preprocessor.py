@@ -5,6 +5,7 @@ import gc
 import logging
 import spacy
 import os
+import re
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 BATCH_SIZE = 64
@@ -36,17 +37,61 @@ class TextPreprocessor:
                 raise ValueError(f"Не удалось загрузить модель из {self.model_path}")
 
     def remove_html_tags(self, text):
-        banned_words = ["</strong>", "<strong>", "</p>", "<p>", "</em>", "<em>", "</ol>", "<ol>",
-            "</div>", "<div>", "</h1>", "<h1>", "</h2>", "<h2>", "</ul>", "<ul>", "<b>",
-            "</b>", "✅", "</h3>", "<h3>", "<li>", "&quot;"]
+        banned_words = ["<strong>","</strong>", "<em>",  "</em>", "/<em>", "<span>", "</span>", "<i>", "</i>", "</ol>", "<ol>", 
+                        "<div>", "</div>", "<ul>", "</ul>", "<b>", "</b>", "<s>", "</s>","&quot;", "<p></p>", "<p> </p>"]
         clean_text = text
         for word in banned_words:
-            clean_text = clean_text.replace(word, " ")
+            clean_text = clean_text.replace(word, "")
         return clean_text.strip()
+    
+    def remove_header(self, text):
+        pattern = r'<h[1-6][^>]*>.*?(</h[1-6]>|/>|$)'
+        
+        cleaned_text = re.sub(pattern, '', text, flags=re.DOTALL)
+        
+        return cleaned_text
 
     def remove_list_tags(self, text):
         try:
-            return text.replace("</li>", "\n").replace("<br />", "\n")
+            def add_punctuation(text_segment):
+                stripped = text_segment.strip()
+                if stripped and not stripped.endswith(('.', ';')):
+                    return stripped + '.'
+                return stripped
+
+            li_pattern = r'<li>(.*?)</li>'
+            li_matches = re.finditer(li_pattern, text, re.DOTALL)
+            
+            for match in li_matches:
+                content = match.group(1).strip()
+                if content: 
+                    cleaned_content = add_punctuation(content)
+                    text = text.replace(match.group(0), cleaned_content + ' ')
+
+            text = text.replace('<li>', '').replace('</li>', '')
+
+            parts = text.split('<br />')
+            cleaned_parts = []
+            for part in parts:
+                cleaned_part = add_punctuation(part)
+                cleaned_parts.append(cleaned_part)
+            text = ' '.join(cleaned_parts)
+
+            p_pattern = r'<p>(.*?)</p>'
+            p_matches = re.finditer(p_pattern, text, re.DOTALL)
+            
+            for match in p_matches:
+                content = match.group(1).strip()
+                if content:  
+                    cleaned_content = add_punctuation(content)
+                    text = text.replace(match.group(0), cleaned_content + ' ')
+
+            text = text.replace('<p>', '').replace('</p>', '')
+
+            text = self.normalize_spaces(text)
+            
+            return text
+
         except Exception as e:
             logging.error(f"Ошибка удаления тегов: {e}", exc_info=True)
             return text
@@ -78,16 +123,48 @@ class TextPreprocessor:
     #         logging.error(f"Ошибка сегментации: {e}", exc_info=True)
     #         return []
         
-    def filter_short_sentences(self, sentences, min_words=0):
+    def filter_short_sentences(self, sentences, min_words=2, max_words=10):
         try:
-            return [s for s in sentences if s.strip() and len(s.split()) >= min_words]
+            result = []
+            for sentence in sentences:
+                cleaned_sentence = sentence.strip()
+                if not cleaned_sentence:
+                    continue
+                
+                words = cleaned_sentence.split()
+                word_count = len(words)
+                
+                if word_count < min_words:
+                    continue
+                
+                if word_count <= max_words:
+                    result.append(cleaned_sentence)
+                else:
+                    num_parts = (word_count + max_words - 1) // max_words  
+                    part_size = word_count // num_parts 
+                    start_idx = 0
+                    for i in range(num_parts):
+                        end_idx = start_idx + part_size
+                        if i == num_parts - 1:  
+                            end_idx = word_count 
+                        
+                        part_words = words[start_idx:end_idx]
+                        part_text = " ".join(part_words)
+                        
+                        if i < num_parts - 1 and not part_text.endswith(('.', ';')):
+                            part_text += ';'
+                        
+                        result.append(part_text)
+                        start_idx = end_idx
+            
+            return result
+        
         except Exception as e:
-            logging.error(f"Ошибка фильтрации: {e}", exc_info=True)
+            logging.error(f"Ошибка фильтрации и разделения: {e}", exc_info=True)
             return []
 
-
     def filter_sentences(self, sentences):
-        return [s[:512] for s in sentences]
+        return [s[:1024] for s in sentences]
 
     def classify_sentences(self, sentences, BATCH_SIZE, exclude_category_label=1):
         try:

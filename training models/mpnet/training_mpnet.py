@@ -81,9 +81,9 @@ def train_model():
     model = SentenceTransformer('paraphrase-multilingual-mpnet-base-v2').to(device)
     
     # Загрузка данных
-    train_data = load_data('training models/обучающая выборка.csv', 'train')
-    dev_data = load_data('training models/валидационная выборка.csv', 'validation')
-    test_data = load_data('training models/тестовая выборка.csv', 'test')
+    train_data = load_data('training models/mpnet/mpnet_train.csv', 'train')
+    dev_data = load_data('training models/mpnet/mpnet_valid.csv', 'validation')
+    test_data = load_data('training models/mpnet/mpnet_test.csv', 'test')
 
     print(f"Размеры наборов данных:")
     print(f"  Обучение: {len(train_data)}")
@@ -99,7 +99,7 @@ def train_model():
     test_evaluator = create_similarity_evaluator(test_data, 'test')
 
     # Параметры обучения
-    output_dir = 'C:/python-models/tuned_model_mpnet_similarity'
+    output_dir = 'C:/python-models/tuned_model_mpnet_v2'
     os.makedirs(output_dir, exist_ok=True)
     
     # Начало обучения

@@ -13,7 +13,7 @@ from moduls.skill_matcher import SkillMatcher
 from moduls.text_preprocessor import TextPreprocessor
 from concurrent.futures import ThreadPoolExecutor
 
-BATCH_SIZE = 64
+BATCH_SIZE=64
 
 class Logic:
     def __init__(self):
@@ -151,12 +151,13 @@ class Logic:
 
             for desc in job_descriptions:
                 clean_html_text = preprocessor.remove_html_tags(desc)
-                clean_list_text = preprocessor.remove_list_tags(clean_html_text)
+                clean_header = preprocessor.remove_header(clean_html_text)
+                clean_list_text = preprocessor.remove_list_tags(clean_header)
                 normalize_spaces_text = preprocessor.normalize_spaces(clean_list_text)
                 sentences = preprocessor.segment_text(normalize_spaces_text)
                 clean_short_sentences = preprocessor.filter_short_sentences(sentences)
                 tokenized_texts.append("\n".join(clean_short_sentences))
-                filtered_sentences = preprocessor.filter_sentences(sentences)
+                filtered_sentences = preprocessor.filter_sentences(clean_short_sentences)
                 filtered_texts.append("\n".join(filtered_sentences))
 
             tokenized_texts = "\n".join(tokenized_texts)
