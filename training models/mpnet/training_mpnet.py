@@ -91,7 +91,7 @@ def train_model():
     print(f"  Тест: {len(test_data)}")
 
     # Создание DataLoader
-    train_dataloader = DataLoader(train_data, shuffle=True, batch_size=16)
+    train_dataloader = DataLoader(train_data, shuffle=True, batch_size=1)
     train_loss = losses.CosineSimilarityLoss(model).to(device)
     
     # Создание оценщиков
@@ -99,22 +99,22 @@ def train_model():
     test_evaluator = create_similarity_evaluator(test_data, 'test')
 
     # Параметры обучения
-    output_dir = 'C:/python-models/tuned_model_mpnet_v2'
+    output_dir = 'C:/python-models/tuned_model_mpnet_v3'
     os.makedirs(output_dir, exist_ok=True)
     
     # Начало обучения
     model.fit(
         train_objectives=[(train_dataloader, train_loss)],
         evaluator=dev_evaluator,
-        epochs=6,
+        epochs=8,
         warmup_steps=100,
         output_path=output_dir,
         save_best_model=True,
-        optimizer_params={'lr': 2e-5},
+        optimizer_params={'lr': 2e-4},
         evaluation_steps=500,
         checkpoint_save_steps=1000,
         checkpoint_save_total_limit=3,
-        callback=lambda score, epoch, steps: print(f"[Эпоха {epoch} шаг {steps}] Текущий скор: {score:.4f}")
+        callback=lambda score, epoch, steps: print(f"[Эпоха {epoch} шаг {steps}] Текущий скор: {score:.6f}")
     )
     
     # Финальная оценка
@@ -123,9 +123,9 @@ def train_model():
     # Вывод всех метрик
     print("\nФинальные результаты на тестовом наборе:")
     for metric, value in test_metrics.items():
-        print(f"  {metric.upper()}: {value:.4f}")
+        print(f"  {metric.upper()}: {value:.6f}")
 
 if __name__ == '__main__':
     print("Начинаем обучение модели...")
     train_model()
-    print("Обучение завершено! Модель сохранена в:", 'C:/python-models/tuned_model_mpnet_similarity')
+    print("Обучение завершено!")

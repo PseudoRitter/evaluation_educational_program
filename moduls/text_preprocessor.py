@@ -8,12 +8,8 @@ import os
 import re
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-BATCH_SIZE = 64
-
-# nlp = spacy.load("ru_core_news_sm")
-
 class TextPreprocessor:
-    def __init__(self, model_path="C:/python-models/fine_tuned_model_v4"):
+    def __init__(self, model_path="C:/python-models/tuned_model_deeppavlov_v1"):
         self.model_path = os.path.normpath(model_path)
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"Директория {self.model_path} не существует.")
@@ -37,8 +33,10 @@ class TextPreprocessor:
                 raise ValueError(f"Не удалось загрузить модель из {self.model_path}")
 
     def remove_html_tags(self, text):
-        banned_words = ["<strong>","</strong>", "<em>",  "</em>", "/<em>", "<span>", "</span>", "<i>", "</i>", "</ol>", "<ol>", 
-                        "<div>", "</div>", "<ul>", "</ul>", "<b>", "</b>", "<s>", "</s>","&quot;", "<p></p>", "<p> </p>"]
+        banned_words = ["<strong>","</strong>", "<em>",  "</em>", "/<em>", 
+                        "<span>", "</span>", "<i>", "</i>", "</ol>", "<ol>", 
+                        "<div>", "</div>", "<ul>", "</ul>", "<b>", "</b>", 
+                        "<s>", "</s>","&quot;", "<p></p>", "<p> </p>"]
         clean_text = text
         for word in banned_words:
             clean_text = clean_text.replace(word, "")
@@ -87,9 +85,7 @@ class TextPreprocessor:
                     text = text.replace(match.group(0), cleaned_content + ' ')
 
             text = text.replace('<p>', '').replace('</p>', '')
-
-            text = self.normalize_spaces(text)
-            
+            text = self.normalize_spaces(text)         
             return text
 
         except Exception as e:
@@ -113,17 +109,7 @@ class TextPreprocessor:
             logging.error(f"Ошибка сегментации: {e}", exc_info=True)
             return []
 
-    # def segment_text(self, text):
-    #     try:
-    #         # Обработка текста с помощью spaCy
-    #         doc = nlp(text)
-    #         # Извлечение предложений и удаление лишних пробелов
-    #         return [sent.text.strip() for sent in doc.sents if sent.text.strip()]
-    #     except Exception as e:
-    #         logging.error(f"Ошибка сегментации: {e}", exc_info=True)
-    #         return []
-        
-    def filter_short_sentences(self, sentences, min_words=2, max_words=10):
+    def filter_short_sentences(self, sentences, min_words=2, max_words=15):
         try:
             result = []
             for sentence in sentences:
@@ -153,7 +139,7 @@ class TextPreprocessor:
                         
                         if i < num_parts - 1 and not part_text.endswith(('.', ';')):
                             part_text += ';'
-                        
+
                         result.append(part_text)
                         start_idx = end_idx
             
@@ -166,7 +152,7 @@ class TextPreprocessor:
     def filter_sentences(self, sentences):
         return [s[:1024] for s in sentences]
 
-    def classify_sentences(self, sentences, BATCH_SIZE, exclude_category_label=1):
+    def classify_sentences(self, sentences, batch_size, exclude_category_label=1):  # Убираем BATCH_SIZE, используем параметр
         try:
             if not sentences:
                 return [], []
@@ -174,8 +160,8 @@ class TextPreprocessor:
             self._load_model()
             results = []
             filtered_sentences = []
-            for i in range(0, len(sentences), BATCH_SIZE):
-                batch = sentences[i:i + BATCH_SIZE]
+            for i in range(0, len(sentences), batch_size):  # Используем переданный batch_size
+                batch = sentences[i:i + batch_size]
                 embeddings = self._encode_batch(batch)
                 for embedding, sentence in zip(embeddings, batch):
                     label = np.argmax(embedding)
@@ -196,7 +182,7 @@ class TextPreprocessor:
                 del self.model
                 gc.collect()
                 torch.cuda.empty_cache()
-
+                
     def _encode_batch(self, batch):
         try:
             inputs = self.tokenizer(batch, padding=True, truncation=True, return_tensors="pt", max_length=128).to(self.device)

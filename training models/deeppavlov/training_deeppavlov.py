@@ -1,28 +1,35 @@
 import os
 import torch
 import pandas as pd
-import numpy as np  # Добавлено для работы с NumPy
+import numpy as np
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
 from datasets import Dataset
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
-# 1. Загрузка данных через pandas
-def load_data(file_path):
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File '{file_path}' not found. Please check the path.")
+# 1. Загрузка данных из CSV файлов
+def load_data_from_files(train_path, val_path, test_path):
+    datasets = [(train_path, "train"), (val_path, "validation"), (test_path, "test")]
+    for path, name in datasets:
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"File '{path}' not found. Please check the path.")
     
-    # Чтение CSV файла
-    df = pd.read_csv(file_path)
+    train_df = pd.read_csv(train_path)
+    val_df = pd.read_csv(val_path)
+    test_df = pd.read_csv(test_path)
     
-    # Проверка наличия столбца 'label'
-    if "label" not in df.columns:
-        raise ValueError("Column 'label' is missing in the dataset. Please ensure your CSV file has a 'label' column.")
+    for df, (path, name) in zip([train_df, val_df, test_df], datasets):
+        if "label" not in df.columns:
+            raise ValueError(f"Column 'label' is missing in the {name} dataset ({path}).")
+        for idx, label in df["label"].items():
+            try:
+                int(label)
+            except (ValueError, TypeError):
+                print(f"Error in {name} dataset ({path}):")
+                print(f"Row {idx}: Unable to convert '{label}' to integer")
+                print(f"Full row content: {df.iloc[idx].to_dict()}")
+                raise ValueError(f"Invalid label found in {name} dataset ({path}). All labels must be numeric.")
     
-    # Разделение на тренировочную и тестовую выборки
-    train_df, eval_df = train_test_split(df, test_size=0.2, random_state=42)
-    
-    return train_df, eval_df
+    return train_df, val_df, test_df
 
 # 2. Токенизация данных
 def tokenize_function(examples, tokenizer):
@@ -32,7 +39,6 @@ def tokenize_function(examples, tokenizer):
         truncation=True, 
         max_length=128
     )
-    # Преобразуем метки в список целых чисел
     if isinstance(examples["label"], list):
         tokenized_inputs["labels"] = [int(label) for label in examples["label"]]
     elif isinstance(examples["label"], (np.ndarray, pd.Series)):
@@ -54,58 +60,57 @@ def compute_metrics(pred):
         "recall": recall
     }
 
-# 4. Дообучение модели с поддержкой GPU
-def fine_tune_model(train_df, eval_df, output_dir="C:/python-models/fine_tuned_model_v4"):
-     # Проверка наличия GPU
+# 4. Дообучение модели с сохранением только последней модели
+def fine_tune_model(train_df, val_df, test_df, output_dir="C:/python-models/fine_tuned_model_v5"):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
     
-    # Загрузка предобученной модели и токенизатора
     tokenizer = AutoTokenizer.from_pretrained("DeepPavlov/rubert-base-cased-sentence")
     model = AutoModelForSequenceClassification.from_pretrained("DeepPavlov/rubert-base-cased", num_labels=2)
-    model.to(device)  # Перемещение модели на GPU (если доступно)
+    model.to(device)
     
-    # Преобразование DataFrame в Dataset
     train_dataset = Dataset.from_pandas(train_df)
-    eval_dataset = Dataset.from_pandas(eval_df)
+    val_dataset = Dataset.from_pandas(val_df)
+    test_dataset = Dataset.from_pandas(test_df)
     
-    # Токенизация датасетов
     tokenized_train_dataset = train_dataset.map(lambda x: tokenize_function(x, tokenizer), batched=True)
-    tokenized_eval_dataset = eval_dataset.map(lambda x: tokenize_function(x, tokenizer), batched=True)
+    tokenized_val_dataset = val_dataset.map(lambda x: tokenize_function(x, tokenizer), batched=True)
+    tokenized_test_dataset = test_dataset.map(lambda x: tokenize_function(x, tokenizer), batched=True)
     
-    # Удаление лишних столбцов и форматирование данных
     tokenized_train_dataset = tokenized_train_dataset.remove_columns(["sentence", "label"])
-    tokenized_eval_dataset = tokenized_eval_dataset.remove_columns(["sentence", "label"])
+    tokenized_val_dataset = tokenized_val_dataset.remove_columns(["sentence", "label"])
+    tokenized_test_dataset = tokenized_test_dataset.remove_columns(["sentence", "label"])
     tokenized_train_dataset.set_format("torch")
-    tokenized_eval_dataset.set_format("torch")
+    tokenized_val_dataset.set_format("torch")
+    tokenized_test_dataset.set_format("torch")
     
-    # Настройка параметров обучения
     training_args = TrainingArguments(
         output_dir=output_dir,
-        evaluation_strategy="epoch",
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
-        num_train_epochs=5,
+        evaluation_strategy="epoch",  # Оцениваем на валидационной выборке после каждой эпохи
+        per_device_train_batch_size=64,
+        per_device_eval_batch_size=64,
+        num_train_epochs=25,
         weight_decay=0.01,
         logging_dir="./logs",
         logging_steps=10,
-        save_strategy="epoch",
-        fp16=True if device == "cuda" else False,  
+        save_strategy="no",  # Отключаем сохранение чекпоинтов во время обучения
+        fp16=True if device == "cuda" else False,
     )
     
-    # Создание объекта Trainer
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=tokenized_train_dataset,
-        eval_dataset=tokenized_eval_dataset,
+        eval_dataset=tokenized_val_dataset,
         compute_metrics=compute_metrics
     )
     
-    # Обучение модели
     trainer.train()
     
-    # Сохранение модели
+    test_results = trainer.evaluate(tokenized_test_dataset)
+    print("Test set results:", test_results)
+    
+    # Сохранение только последней модели
     model.save_pretrained(output_dir, safe_serialization=False)
     tokenizer.save_pretrained(output_dir)
     
@@ -113,18 +118,16 @@ def fine_tune_model(train_df, eval_df, output_dir="C:/python-models/fine_tuned_m
 
 # Основной скрипт
 if __name__ == "__main__":
-    # Путь к файлу с данными
-    file_path = "training models/deeppavlov_train.csv" # Укажите путь к вашему CSV файлу
+    train_path = "training models/deeppavlov/deeppavlov_train.csv"
+    val_path = "training models/deeppavlov/deeppavlov_valid.csv"
+    test_path = "training models/deeppavlov/deeppavlov_test.csv"
     
-    # Проверка существования файла
-    if not os.path.exists(file_path):
-        print(f"Error: File '{file_path}' not found. Please check the path.")
+    missing_files = [path for path in [train_path, val_path, test_path] if not os.path.exists(path)]
+    if missing_files:
+        print(f"Error: The following files were not found: {', '.join(missing_files)}. Please check the paths.")
     else:
-        print(f"File '{file_path}' found. Proceeding...")
+        print(f"All files found. Proceeding...")
         
-        # Шаг 1: Загрузка данных
-        train_df, eval_df = load_data(file_path)
-        
-        # Шаг 2: Дообучение модели
-        output_dir = "C:/python-models/fine_tuned_model_v4"
-        model, tokenizer = fine_tune_model(train_df, eval_df, output_dir)
+        train_df, val_df, test_df = load_data_from_files(train_path, val_path, test_path)
+        output_dir = "/content/drive/MyDrive/train_model/fine_tuned_model_v5"
+        model, tokenizer = fine_tune_model(train_df, val_df, test_df, output_dir)

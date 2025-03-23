@@ -2,7 +2,7 @@ import tkinter as tk
 import logging
 from gui.app import App
 from logic import Logic
-3
+
 def configure_logging():
     logging.basicConfig(
         level=logging.DEBUG,
@@ -13,9 +13,11 @@ def configure_logging():
 def main():
     configure_logging()
 
+    BATCH_SIZE = 16  # Пользователь может изменить это значение здесь
+
     root = tk.Tk()
-    logic = Logic()
-    app = App(root, logic)
+    logic = Logic(batch_size=BATCH_SIZE)  
+    app = App(root, logic, batch_size=BATCH_SIZE) 
     
     try:
         root.mainloop()

@@ -29,7 +29,7 @@ class LaborMarketData:
             if response.status_code == 200:
                 data = response.json()
                 return data.get("items", []), data.get("pages", 1)
-            elif response.status_code == 429:  # Too Many Requests
+            elif response.status_code == 429:  
                 logging.warning(f"Лимит запросов превышен для {experience}, страница {page}. Увеличиваем задержку.")
                 self.rate_limit_delay += 1.0
                 time.sleep(self.rate_limit_delay)

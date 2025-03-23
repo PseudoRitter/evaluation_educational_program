@@ -10,15 +10,12 @@ from .assessment_tab import create_assessment_tab
 from .assessment_history_tab import create_rating_history_tab
 from .graph_tab import create_graph_tab
 
-BATCH_SIZE = 64
-
 class App:
-    """Основной класс приложения для оценки соответствия образовательных программ."""
-
-    def __init__(self, root, logic):
+    def __init__(self, root, logic, batch_size):  # Добавляем batch_size
         """Инициализация приложения с главным окном и логикой."""
         self.root = root
         self.logic = logic
+        self.batch_size = batch_size  # Сохраняем batch_size как атрибут
         self.last_selected_program_data = None
         self.root.title("Оценка соответствия образовательной программы")
         self.root.geometry("1100x800")
@@ -116,7 +113,7 @@ class App:
 
             logging.debug(f"Запуск анализа с порогом: {threshold}, использование весов: {use_weights}, веса: {weights}")
             self.show_info("Запуск анализа...")
-            future = self.executor.submit(self.logic.run_analysis, self.program_id, self.selected_vacancy_id, self, BATCH_SIZE, threshold, use_weights, weights)
+            future = self.executor.submit(self.logic.run_analysis, self.program_id, self.selected_vacancy_id, self, self.batch_size, threshold, use_weights, weights)
             future.add_done_callback(self.on_analysis_complete)
         except ValueError:
             self.show_error("Введите корректные числовые значения для порога и весов (от 0 до 1)!")
@@ -142,7 +139,6 @@ class App:
         logging.info(f"GUI Info: {message}")
 
     def update_results(self, results):
-        """Обновление результатов с учетом текущих весов."""
         try:
             self.skill_results_table.delete(*self.skill_results_table.get_children())
             self.group_scores_area.delete(1.0, tk.END)

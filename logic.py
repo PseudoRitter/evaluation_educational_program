@@ -6,19 +6,18 @@ import logging
 import os
 import json
 import tkinter as tk
-from tkinter import  messagebox
+from tkinter import messagebox
 from moduls.database import Database
 from moduls.export_to_excel import ExcelExporter
 from moduls.skill_matcher import SkillMatcher
 from moduls.text_preprocessor import TextPreprocessor
 from concurrent.futures import ThreadPoolExecutor
 
-BATCH_SIZE=64
-
 class Logic:
-    def __init__(self):
+    def __init__(self, batch_size):  # Добавляем batch_size
         self.results = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.batch_size = batch_size  # Сохраняем как атрибут
         self.db_params = {
             "database": "postgres",
             "user": "postgres",
@@ -27,7 +26,7 @@ class Logic:
             "port": "5432"
         }
         self.db = Database(self.db_params, data_dir="vacancies_hh")
-        self.preprocessor = TextPreprocessor()
+        self.preprocessor = TextPreprocessor()  # Модель сама использует batch_size, позже исправим
         self.matcher = SkillMatcher(device=self.device)
         self.executor = ThreadPoolExecutor(max_workers=4)
 
@@ -165,7 +164,7 @@ class Logic:
 
             gui.show_info("Шаг 1: Классификация и фильтрация предложений...")
             classified_results, filtered_sentences = preprocessor.classify_sentences(
-                filtered_texts.split("\n"), BATCH_SIZE=batch_size, exclude_category_label=1
+                filtered_texts.split("\n"), batch_size=self.batch_size, exclude_category_label=1  # Используем self.batch_size
             )
             logging.debug(f"Классифицировано предложений: {len(classified_results)}")
             gui.update_classification_table(classified_results)
@@ -178,7 +177,7 @@ class Logic:
             
             gui.show_info("Шаг 2: Оценка соответствия компетенций...")
             matcher = SkillMatcher(device=device)
-            results = matcher.match_skills(skills, filtered_texts.split("\n"), batch_size, threshold)
+            results = matcher.match_skills(skills, filtered_texts.split("\n"), self.batch_size, threshold)  # Используем self.batch_size
             similarity_results = {
                 skill: (score, ctype) for skill, score, ctype in zip(skills, results["sentence_transformer"].values(), competence_types)
             }
@@ -217,7 +216,6 @@ class Logic:
                 torch.cuda.empty_cache()
         
             tk.messagebox.showinfo(title="Информация", message="Оценка завершена!")
-
 
     def export_results_to_excel(self, app):
         selected_program = app.selected_program_label.cget("text").replace("Выбрана программа: ", "")
