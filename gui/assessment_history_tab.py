@@ -41,10 +41,7 @@ def create_rating_history_tab(frame, app):
     app.history_prof_weight_entry.insert(0, "0.4")
     app.history_prof_weight_entry.pack(side="left", padx=5)
 
-    app.export_history_button = tk.Button(control_frame, text="Экспорт в Excel", command=lambda: export_history_to_excel(app))
-    app.export_history_button.pack(side=tk.LEFT, padx=5)
-    app.delete_history_button = tk.Button(control_frame, text="Удалить", command=lambda: delete_assessment_table(app))
-    app.delete_history_button.pack(side=tk.LEFT, padx=5)
+
 
     def validate_weight(value):
         if value == "":
@@ -99,6 +96,11 @@ def create_rating_history_tab(frame, app):
     group_scores_frame.pack(pady=4, fill="both", expand=False)
     app.group_scores_history_frame = scrolledtext.ScrolledText(group_scores_frame, width=120, height=8)
     app.group_scores_history_frame.pack(pady=4)
+
+    app.export_history_button = tk.Button(control_frame, text="Экспорт в Excel", command=lambda: export_history_to_excel(app))
+    app.export_history_button.pack(side=tk.LEFT, padx=5)
+    app.delete_history_button = tk.Button(control_frame, text="Удалить", command=lambda: delete_assessment_table(app))
+    app.delete_history_button.pack(side=tk.LEFT, padx=5)
 
     load_program_vacancy_history_table(app)
 

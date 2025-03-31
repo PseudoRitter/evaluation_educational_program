@@ -109,7 +109,7 @@ class TextPreprocessor:
             logging.error(f"Ошибка сегментации: {e}", exc_info=True)
             return []
 
-    def filter_short_sentences(self, sentences, min_words=2, max_words=15):
+    def filter_short_sentences(self, sentences, min_words=1, max_words=10):
         try:
             result = []
             for sentence in sentences:
@@ -152,7 +152,7 @@ class TextPreprocessor:
     def filter_sentences(self, sentences):
         return [s[:1024] for s in sentences]
 
-    def classify_sentences(self, sentences, batch_size, exclude_category_label=1):  # Убираем BATCH_SIZE, используем параметр
+    def classify_sentences(self, sentences, batch_size, exclude_category_label=1):  
         try:
             if not sentences:
                 return [], []
@@ -160,12 +160,12 @@ class TextPreprocessor:
             self._load_model()
             results = []
             filtered_sentences = []
-            for i in range(0, len(sentences), batch_size):  # Используем переданный batch_size
+            for i in range(0, len(sentences), batch_size):  
                 batch = sentences[i:i + batch_size]
                 embeddings = self._encode_batch(batch)
                 for embedding, sentence in zip(embeddings, batch):
                     label = np.argmax(embedding)
-                    if label != exclude_category_label:
+                    if label != exclude_category_label: #!= остается нужное, == остается не нежное (о компании, условия работы)
                         results.append((sentence, label))
                         filtered_sentences.append(sentence)
                 if self.device == "cuda":

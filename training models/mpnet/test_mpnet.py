@@ -16,7 +16,6 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("mpnet_test.log"),  # Логи в файл
         logging.StreamHandler()                 # Логи в консоль
     ]
 )
@@ -24,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Путь к модели
 #model_path = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"  # или укажите локальный путь
-model_path = "C:/python-models/tuned_model_mpnet_v1"
+model_path = "C:/python-models/tuned_model_mpnet_v0.5"
 
 # Загрузка модели
 try:
@@ -59,7 +58,7 @@ def compute_ndcg_at_k(true_labels, predicted_scores, k):
     return dcg / idcg
 
 # Загрузка данных
-data_path = "training models/mpnet/mpnet_train.csv"
+data_path = "training models/mpnet/resv2.csv"
 try:
     data = pd.read_csv(data_path)
     logger.info(f"Данные успешно загружены из {data_path}")
@@ -117,8 +116,16 @@ def compute_ndcg_at_k(true_labels, predicted_scores, k):
     idcg = sum(ideal_sorted_labels[i] / np.log2(i + 2) for i in range(k))
     return dcg / idcg if idcg > 0 else 0
 
-# Предполагается, что labels и predicted_similarities уже определены
-# Вычисление метрик
+# Функция для вычисления Mean Reciprocal Rank (MRR)
+def compute_mrr(true_labels, predicted_scores):
+    sorted_indices = np.argsort(predicted_scores)[::-1]
+    true_labels_sorted = np.array(true_labels)[sorted_indices]
+    for i, label in enumerate(true_labels_sorted, 1):
+        if label > 0.5:  # Предполагаем, что релевантность > 0.5
+            return 1.0 / i
+    return 0.0
+
+# Вычисление метрик (добавляем MRR)
 pearson_corr, _ = pearsonr(labels, predicted_similarities)
 spearman_corr, _ = spearmanr(labels, predicted_similarities)
 mse = mean_squared_error(labels, predicted_similarities)
@@ -132,31 +139,27 @@ bias = np.mean(np.array(labels) - np.array(predicted_similarities))
 r2 = r2_score(labels, predicted_similarities)
 ndcg_5 = compute_ndcg_at_k(labels, predicted_similarities, 5)
 ndcg_10 = compute_ndcg_at_k(labels, predicted_similarities, 10)
+mrr = compute_mrr(labels, predicted_similarities)
 
-# Дополнительные метрики для косинусного сходства
-error_margin = 0.1
-cosin_accuracy = np.mean(np.abs(np.array(labels) - np.array(predicted_similarities)) < error_margin)
-mape = np.mean(np.abs((np.array(labels) - np.array(predicted_similarities)) / np.array(labels))) * 100
-
-# Метрики классификации для разных порогов
-thresholds = [0.3, 0.5, 0.7]
-for threshold in thresholds:
-    true_classes = [1 if label > threshold else 0 for label in labels]
-    predicted_classes = [1 if pred > threshold else 0 for pred in predicted_similarities]
-    accuracy = accuracy_score(true_classes, predicted_classes)
-    precision = precision_score(true_classes, predicted_classes, zero_division=0)
-    recall = recall_score(true_classes, predicted_classes, zero_division=0)
-    f1 = f1_score(true_classes, predicted_classes, zero_division=0)
-    roc_auc = roc_auc_score(true_classes, predicted_similarities)
+# # Метрики классификации для разных порогов
+# thresholds = [0.3, 0.5, 0.7]
+# for threshold in thresholds:
+#     true_classes = [1 if label > threshold else 0 for label in labels]
+#     predicted_classes = [1 if pred > threshold else 0 for pred in predicted_similarities]
+#     accuracy = accuracy_score(true_classes, predicted_classes)
+#     precision = precision_score(true_classes, predicted_classes, zero_division=0)
+#     recall = recall_score(true_classes, predicted_classes, zero_division=0)
+#     f1 = f1_score(true_classes, predicted_classes, zero_division=0)
+#     roc_auc = roc_auc_score(true_classes, predicted_similarities)
     
-    logger.info(f"\nМетрики классификации (порог={threshold}):")
-    logger.info(f"Accuracy: {accuracy:.6f}")
-    logger.info(f"Precision: {precision:.6f}")
-    logger.info(f"Recall: {recall:.6f}")
-    logger.info(f"F1-Score: {f1:.6f}")
-    logger.info(f"ROC-AUC: {roc_auc:.6f}")
+#     logger.info(f"\nМетрики классификации (порог={threshold}):")
+#     logger.info(f"Accuracy: {accuracy:.6f}")
+#     logger.info(f"Precision: {precision:.6f}")
+#     logger.info(f"Recall: {recall:.6f}")
+#     logger.info(f"F1-Score: {f1:.6f}")
+#     logger.info(f"ROC-AUC: {roc_auc:.6f}")
 
-# Вывод результатов в логи
+# Вывод результатов в логи (обновленный блок с пояснениями)
 logger.info("\nРезультаты оценки качества модели:")
 logger.info("\nМетрики, основанные на ошибках:")
 logger.info(f"Корреляция Пирсона: {pearson_corr:.6f}")
@@ -166,10 +169,10 @@ logger.info(f"Root Mean Squared Error (RMSE): {rmse:.6f}")
 logger.info(f"Mean Absolute Error (MAE): {mae:.6f}")
 logger.info(f"R-squared: {r2:.6f}")
 logger.info(f"Mean Bias: {bias:.6f}")
-logger.info(f"Cosin Accuracy (error < {error_margin}): {cosin_accuracy:.6f}")
-logger.info(f"Mean Absolute Percentage Error (MAPE): {mape:.6f}%")
 
-logger.info("\nМетрики, основанные на ранжировании:")
+logger.info("\nМетрики, основанные на сходстве и ранжировании:")
+logger.info(f"Среднее косинусное сходство: {np.mean(predicted_similarities):.6f}")
+logger.info(f"Mean Reciprocal Rank (MRR): {mrr:.6f}")
 logger.info(f"Kendall Tau: {kendall_corr:.6f}")
 logger.info(f"Normalized Discounted Cumulative Gain (NDCG): {ndcg:.6f}")
 logger.info(f"NDCG@5: {ndcg_5:.6f}")
@@ -218,14 +221,4 @@ plt.xlabel("Истинные оценки")
 plt.ylabel("Предсказанные сходства")
 plt.title("Истинные vs. Предсказанные сходства")
 plt.plot([0, 1], [0, 1], color='red', linestyle='--')
-plt.show()
-
-# Bland-Altman plot
-mean_values = (np.array(labels) + np.array(predicted_similarities)) / 2
-diff_values = np.array(labels) - np.array(predicted_similarities)
-plt.scatter(mean_values, diff_values, alpha=0.5)
-plt.axhline(0, color='red', linestyle='--')
-plt.xlabel("Среднее значение (True + Predicted) / 2")
-plt.ylabel("Разница (True - Predicted)")
-plt.title("Bland-Altman Plot")
 plt.show()

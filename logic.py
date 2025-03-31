@@ -80,18 +80,16 @@ class Logic:
         return {ctype: np.mean(scores) if scores else 0.0 for ctype, scores in group_scores.items()}
 
     def calculate_overall_score(self, group_scores, use_weights, weights):
-        """Расчет общей оценки и взвешенных групповых оценок с учетом весов."""
         if not group_scores:
             return 0.0, {}
 
         if not use_weights:
             return np.mean(list(group_scores.values())) if group_scores else 0.0, group_scores
 
-        # Взвешенные групповые оценки
         weighted_group_scores = {}
         overall_score = 0.0
         for ctype, score in group_scores.items():
-            weight = weights.get(ctype, 0.0)  # Если вес не указан, = 0
+            weight = weights.get(ctype, 0.0) 
             weighted_score = score * weight
             weighted_group_scores[ctype] = weighted_score
             overall_score += weighted_score
@@ -164,7 +162,7 @@ class Logic:
 
             gui.show_info("Шаг 1: Классификация и фильтрация предложений...")
             classified_results, filtered_sentences = preprocessor.classify_sentences(
-                filtered_texts.split("\n"), batch_size=self.batch_size, exclude_category_label=1  # Используем self.batch_size
+                filtered_texts.split("\n"), batch_size=self.batch_size, exclude_category_label=1  
             )
             logging.debug(f"Классифицировано предложений: {len(classified_results)}")
             gui.update_classification_table(classified_results)
@@ -177,7 +175,7 @@ class Logic:
             
             gui.show_info("Шаг 2: Оценка соответствия компетенций...")
             matcher = SkillMatcher(device=device)
-            results = matcher.match_skills(skills, filtered_texts.split("\n"), self.batch_size, threshold)  # Используем self.batch_size
+            results = matcher.match_skills(skills, filtered_texts.split("\n"), self.batch_size, threshold)  
             similarity_results = {
                 skill: (score, ctype) for skill, score, ctype in zip(skills, results["sentence_transformer"].values(), competence_types)
             }

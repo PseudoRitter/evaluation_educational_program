@@ -16,8 +16,7 @@ def create_assessment_tab(frame, app):
     app.run_button = tk.Button(run_frame, text="Запустить анализ", command=app.start_analysis)
     app.run_button.pack(side="left", padx=5)
 
-    app.export_button = tk.Button(run_frame, text="Экспорт в Excel", command=lambda: app.logic.export_results_to_excel(app))
-    app.export_button.pack(side=tk.LEFT, padx=5)
+
 
     app.save_results_button = tk.Button(run_frame, text="Сохранить результаты в историю", command=lambda: save_assessment_results(app))
     app.save_results_button.pack(side=tk.LEFT, padx=5)
@@ -26,8 +25,8 @@ def create_assessment_tab(frame, app):
     control_frame.pack(pady=4, fill="x")
 
     # Кнопка "Обновить"
-    app.refresh_button = tk.Button(control_frame, text="Обновить", command=lambda: update_weights(app))
-    app.refresh_button.pack(side="left", padx=5)
+    # app.refresh_button = tk.Button(control_frame, text="Обновить", command=lambda: update_weights(app))
+    # app.refresh_button.pack(side="left", padx=5)
 
     threshold_frame = ttk.LabelFrame(control_frame, text="Настройки")
     threshold_frame.pack(side="left", padx=5, pady=5)
@@ -109,6 +108,9 @@ def create_assessment_tab(frame, app):
     app.skill_results_table.column("score", width=80)
     app.skill_results_table.pack(pady=4, fill="x")
 
+    app.export_button = tk.Button(run_frame, text="Экспорт в Excel", command=lambda: app.logic.export_results_to_excel(app))
+    app.export_button.pack(side=tk.LEFT, padx=5)
+
     group_scores_frame = tk.LabelFrame(results_container, text="Оценки групп и программы:")
     group_scores_frame.pack(pady=4, fill="both", expand=False)
     app.group_scores_area = scrolledtext.ScrolledText(group_scores_frame, width=120, height=8)
@@ -166,8 +168,6 @@ def save_assessment_results(app):
         conn = app.logic.db.get_connection()
         with conn.cursor() as cursor:
             for competence, (score, type_competence) in results.items():
-                # Сохраняем "сырые" значения компетенций без учета пользовательских весов
-                # Это эквивалентно формату, где веса УК, ОК, ПК равны 1/3
                 competence_data = app.logic.db.fetch_competence_by_name(competence)
                 if not competence_data:
                     logging.error(f"Компетенция '{competence}' не найдена!")

@@ -13,7 +13,7 @@ def configure_logging():
 def main():
     configure_logging()
 
-    BATCH_SIZE = 16  # Пользователь может изменить это значение здесь
+    BATCH_SIZE = 32
 
     root = tk.Tk()
     logic = Logic(batch_size=BATCH_SIZE)  

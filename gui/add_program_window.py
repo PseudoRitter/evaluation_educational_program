@@ -92,8 +92,8 @@ def create_university_section(parent_frame, app, window):
 
     button_frame = tk.Frame(container)
     button_frame.pack(side=tk.LEFT, padx=2, pady=4, fill="y")
-    tk.Button(button_frame, text="Добавить", command=lambda: edit_entity_window(app, window, "university", "add")).pack(pady=4)
-    tk.Button(button_frame, text="Редактировать", command=lambda: edit_entity_window(app, window, "university", "edit")).pack(pady=4)
+    tk.Button(button_frame, text="Добавить", command=lambda: edit_entity_window(app, window, "university", "добавить")).pack(pady=4)
+    tk.Button(button_frame, text="Редактировать", command=lambda: edit_entity_window(app, window, "university", "изменить")).pack(pady=4)
     tk.Button(button_frame, text="Удалить", command=lambda: delete_entity(app, window, "university")).pack(pady=4)
 
 def create_program_section(parent_frame, app, window):
@@ -123,8 +123,8 @@ def create_program_section(parent_frame, app, window):
 
     button_frame = tk.Frame(container)
     button_frame.pack(side=tk.LEFT, padx=2, pady=2, fill="y")
-    tk.Button(button_frame, text="Добавить", command=lambda: edit_entity_window(app, window, "program", "add")).pack(pady=4)
-    tk.Button(button_frame, text="Редактировать", command=lambda: edit_entity_window(app, window, "program", "edit")).pack(pady=4)
+    tk.Button(button_frame, text="Добавить", command=lambda: edit_entity_window(app, window, "program", "добавить")).pack(pady=4)
+    tk.Button(button_frame, text="Редактировать", command=lambda: edit_entity_window(app, window, "program", "изменить")).pack(pady=4)
     tk.Button(button_frame, text="Удалить", command=lambda: delete_entity(app, window, "program")).pack(pady=4)
 
     app.add_window_selected_program_label = tk.Label(frame, text="Выбрана программа: Нет")
@@ -150,8 +150,8 @@ def create_competence_section(parent_frame, app, window):
 
     button_frame = tk.Frame(container)
     button_frame.pack(side=tk.LEFT, padx=4, pady=2, fill="y")
-    tk.Button(button_frame, text="Добавить", command=lambda: edit_entity_window(app, window, "competence", "add")).pack(pady=4)
-    tk.Button(button_frame, text="Редактировать", command=lambda: edit_entity_window(app, window, "competence", "edit")).pack(pady=4)
+    tk.Button(button_frame, text="Добавить", command=lambda: edit_entity_window(app, window, "competence", "добавить")).pack(pady=4)
+    tk.Button(button_frame, text="Редактировать", command=lambda: edit_entity_window(app, window, "competence", "изменить")).pack(pady=4)
     tk.Button(button_frame, text="Удалить", command=lambda: delete_entity(app, window, "competence")).pack(pady=4)
 
 def on_program_table_select(app):
@@ -199,13 +199,13 @@ def on_program_table_select(app):
 def edit_entity_window(app, parent_window, entity_type, action):
     entity_configs = {
         "university": {
-            "title": "ВУЗ" if action == "add" else " ",
+            "title": "ВУЗ" if action == "добавить" else " ",
             "fields": [("Наименование ВУЗа:", lambda w: tk.Entry(w, width=60)), ("Сокращение:", tk.Entry), ("Город:", tk.Entry)],
             "size": "400x300",
             "fetch": lambda: app.university_table.item(app.university_table.selection()[0])["values"] if app.university_table.selection() else None
         },
         "program": {
-            "title": "Программа" if action == "add" else " ",
+            "title": "Программа" if action == "добавить" else " ",
             "fields": [
                 ("Наименование ОП:", lambda w: tk.Entry(w, width=60)),
                 ("Код ОП:", tk.Entry),
@@ -217,7 +217,7 @@ def edit_entity_window(app, parent_window, entity_type, action):
             "fetch": lambda: app.program_table.item(app.program_table.selection()[0])["values"] if app.program_table.selection() else None
         },
         "competence": {
-            "title": "Компетенция" if action == "add" else " ",
+            "title": "Компетенция" if action == "добавить" else " ",
             "fields": [
                 ("Компетенция:", lambda w: scrolledtext.ScrolledText(w, width=80, height=8)),
                 ("Вид компетенции:", lambda w: ttk.Combobox(w, values=[t[1] for t in app.logic.db.fetch_competence_types()], state="readonly"))
@@ -229,7 +229,7 @@ def edit_entity_window(app, parent_window, entity_type, action):
     }
 
     config = entity_configs[entity_type]
-    if action == "edit" and not config["fetch"]():
+    if action == "изменить" and not config["fetch"]():
         logging.error(f"Выберите {entity_type} для редактирования!")
         return
     if entity_type == "competence" and config["requires_program"] and not hasattr(app, "selected_program_id"):
@@ -257,10 +257,10 @@ def edit_entity_window(app, parent_window, entity_type, action):
         if label == "Компетенция:" and isinstance(widget, scrolledtext.ScrolledText):
             tk.Button(window, text="Удаление символов", command=lambda w=widget: remove_newlines(w)).pack(pady=4)
 
-        if action == "edit" and isinstance(widget, ttk.Combobox):
+        if action == "изменить" and isinstance(widget, ttk.Combobox):
             widget.set(config["fetch"]()[config["fields"].index((label, widget_type))])
 
-    if action == "edit":
+    if action == "изменить":
         old_values = config["fetch"]()
         for entry, value in zip(entries, old_values):
             if isinstance(entry, tk.Entry):
@@ -268,7 +268,7 @@ def edit_entity_window(app, parent_window, entity_type, action):
             elif isinstance(entry, scrolledtext.ScrolledText):
                 entry.insert("1.0", value)
 
-    tk.Button(window, text="Сохранить", command=lambda: save_entity(app, window, parent_window, entity_type, action, entries, old_values if action == "edit" else None)).pack(pady=5)
+    tk.Button(window, text="Сохранить", command=lambda: save_entity(app, window, parent_window, entity_type, action, entries, old_values if action == "изменить" else None)).pack(pady=5)
 def remove_newlines(text_widget):
     """Удаление символов новой строки из текста."""
     try:
@@ -331,7 +331,7 @@ def save_entity(app, window, parent_window, entity_type, action, entries, old_va
 def save_university(app, values, old_values, action):
     """Сохранение данных университета."""
     full_name, short_name, city = values
-    if action == "add":
+    if action == "добавить":
         university_id = app.logic.db.save_university(full_name, short_name, city)
         if university_id:
             app.universities = app.logic.db.fetch_universities()
@@ -352,7 +352,7 @@ def save_program(app, values, old_values, action):
         return
 
     university_id, type_program_id = university[0], type_program[0]
-    if action == "add":
+    if action == "добавить":
         program_id = app.logic.db.save_educational_program(name, code, university_id, year, type_program_id, [])
         if program_id:
             app.programs = app.logic.db.fetch_educational_programs_with_details()
@@ -385,7 +385,7 @@ def save_competence(app, values, old_values, action):
     conn = app.logic.db.get_connection()
     try:
         with conn.cursor() as cursor:
-            if action == "add":
+            if action == "добавить":
                 competence = app.logic.db.fetch_competence_by_name(competence_name)
                 competence_id = app.logic.db.save_competence(competence_name, type_id) if not competence else competence[0]
                 cursor.execute("""
