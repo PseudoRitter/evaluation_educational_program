@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Путь к модели
 #model_path = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"  # или укажите локальный путь
-model_path = "C:/python-models/tuned_model_mpnet_v0.5"
+model_path = "C:/python-models/tuned_model_mpnet_v20"
 
 # Загрузка модели
 try:
@@ -58,7 +58,7 @@ def compute_ndcg_at_k(true_labels, predicted_scores, k):
     return dcg / idcg
 
 # Загрузка данных
-data_path = "training models/mpnet/resv2.csv"
+data_path = "training models/mpnet/mpnet_test.csv"
 try:
     data = pd.read_csv(data_path)
     logger.info(f"Данные успешно загружены из {data_path}")

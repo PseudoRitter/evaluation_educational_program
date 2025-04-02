@@ -9,6 +9,7 @@ from .debug_tab import create_debug_tab
 from .assessment_tab import create_assessment_tab
 from .assessment_history_tab import create_rating_history_tab
 from .graph_tab import create_graph_tab
+from moduls.table_processing import sort_treeview_column, sort_competence_type_column
 
 class App:
     def __init__(self, root, logic, batch_size):  # Добавляем batch_size
@@ -163,6 +164,7 @@ class App:
                         self.show_error(f"Вес для {key} должен быть от 0 до 1!")
                         return
             overall_score, weighted_group_scores = self.logic.calculate_overall_score(results["group_scores"], use_weights, weights)
+            sort_competence_type_column(self.skill_results_table, "competence_type")
 
             self.group_scores_area.insert(tk.END, "Оценки групп компетенций:\n")
             for ctype, score in (weighted_group_scores if use_weights else results["group_scores"]).items():

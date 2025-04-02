@@ -5,7 +5,7 @@ import gc
 import numpy as np
 
 class SkillMatcher:
-    def __init__(self, device="cpu", model_path="C:/python-models/tuned_model_mpnet_v17"):
+    def __init__(self, device="cpu", model_path="C:/python-models/tuned_model_mpnet_v20"): #"sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
         self.device = device
         self.model_path = model_path
         self.model = None

@@ -14,10 +14,10 @@ from moduls.text_preprocessor import TextPreprocessor
 from concurrent.futures import ThreadPoolExecutor
 
 class Logic:
-    def __init__(self, batch_size):  # Добавляем batch_size
+    def __init__(self, batch_size):  
         self.results = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.batch_size = batch_size  # Сохраняем как атрибут
+        self.batch_size = batch_size  
         self.db_params = {
             "database": "postgres",
             "user": "postgres",
@@ -26,7 +26,7 @@ class Logic:
             "port": "5432"
         }
         self.db = Database(self.db_params, data_dir="vacancies_hh")
-        self.preprocessor = TextPreprocessor()  # Модель сама использует batch_size, позже исправим
+        self.preprocessor = TextPreprocessor()  
         self.matcher = SkillMatcher(device=self.device)
         self.executor = ThreadPoolExecutor(max_workers=4)
 
@@ -47,31 +47,11 @@ class Logic:
             description = program_details[0][1]
             skills = [row[5] for row in program_details if row[5]]
             competence_ids = [row[4] for row in program_details if row[5]]
-            competence_types = self.get_competence_types(competence_ids)
+            competence_types = self.db.get_competence_types(competence_ids)
             return name, description, list(zip(skills, competence_types))
         except Exception as e:
             logging.error(f"Ошибка загрузки программы: {e}")
             return None, "", []
-
-    def get_competence_types(self, competence_ids):
-        try:
-            if not competence_ids:
-                return []
-            query = """
-                SELECT c.competence_id, tc.type_competence_full_name
-                FROM competence c
-                JOIN type_competence tc ON c.type_competence_id = tc.type_competence_id
-                WHERE c.competence_id IN %s;
-            """
-            conn = self.db.get_connection()
-            with conn.cursor() as cursor:
-                cursor.execute(query, (tuple(competence_ids),))
-                types = dict(cursor.fetchall())
-            self.db.release_connection(conn)
-            return [types.get(cid, "Неизвестно") for cid in competence_ids]
-        except Exception as e:
-            logging.error(f"Ошибка получения типов компетенций: {e}")
-            return ["Неизвестно"] * len(competence_ids)
 
     def calculate_competence_group_scores(self, skills_with_types, similarity_scores):
         group_scores = {}
@@ -206,13 +186,12 @@ class Logic:
             return {}
         finally:
             if hasattr(self, "device") and self.device == "cuda":
-                logging.info("Очистка кэша GPU после завершения анализа...")
+                logging.info("Очистка кэш GPU после завершения анализа...")
                 if "matcher" in locals() and hasattr(matcher, "model"):
                     matcher.model.to("cpu")
                 del preprocessor
                 gc.collect()
-                torch.cuda.empty_cache()
-        
+                torch.cuda.empty_cache()         
             tk.messagebox.showinfo(title="Информация", message="Оценка завершена!")
 
     def export_results_to_excel(self, app):

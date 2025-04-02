@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 import logging
 from .add_program_window import create_add_program_window
-from moduls.table_sort import sort_treeview_column, sort_competence_type_column  
+from moduls.table_processing import sort_treeview_column, sort_competence_type_column, add_tooltip_to_treeview
 
 def create_education_tab(frame, app):
     education_program_frame = tk.Frame(frame)
@@ -25,6 +25,8 @@ def create_education_tab(frame, app):
     app.education_table.pack(pady=4, fill="x", expand=False)
     app.education_table.bind("<<TreeviewSelect>>", lambda event: preview_competences(app))
 
+    add_tooltip_to_treeview(app.education_table)
+
     education_program_select_frame = tk.Frame(frame)
     education_program_select_frame.pack(pady=4, fill="x", expand=False)
 
@@ -43,6 +45,8 @@ def create_education_tab(frame, app):
     app.competence_table.column("competence", width=620, stretch=True)
     app.competence_table.column("competence_type", width=80)
     app.competence_table.pack(pady=4, fill="both", expand=False)
+
+    add_tooltip_to_treeview(app.competence_table)
 
     app.add_program_button = tk.Button(frame, text="Добавить программу", command=lambda: create_add_program_window(app.root, app))
     app.add_program_button.pack(padx=5, pady=5)

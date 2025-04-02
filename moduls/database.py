@@ -2,6 +2,7 @@ from psycopg2.pool import ThreadedConnectionPool
 import logging
 import numpy as np
 from psycopg2 import Error
+from datetime import datetime
 
 class Database:
     def __init__(self, db_params, data_dir="vacancies"):
@@ -59,7 +60,7 @@ class Database:
         try:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                    SELECT vacancy_id, vacancy_name, vacancy_num, vacancty_date, vacancy_file
+                    SELECT vacancy_id, vacancy_name, vacancy_num, vacancy_date, vacancy_file
                     FROM vacancy
                     ORDER BY vacancy_name;
                 """)
@@ -102,7 +103,7 @@ class Database:
         try:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                    SELECT vacancy_name, vacancy_num, vacancty_date, vacancy_file
+                    SELECT vacancy_name, vacancy_num, vacancy_date, vacancy_file
                     FROM vacancy
                     WHERE vacancy_id = %s;
                 """, (vacancy_id,))
@@ -143,7 +144,7 @@ class Database:
         try:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                    INSERT INTO vacancy (vacancy_name, vacancy_num, vacancty_date, vacancy_file)
+                    INSERT INTO vacancy (vacancy_name, vacancy_num, vacancy_date, vacancy_file)
                     VALUES (%s, %s, %s, %s)
                     RETURNING vacancy_id;
                 """, (name, num, date, file_path))
@@ -536,7 +537,7 @@ class Database:
             with conn.cursor() as cursor:
                 cursor.execute("""
                     UPDATE vacancy
-                    SET vacancy_name = %s, vacancy_num = %s, vacancty_date = %s, vacancy_file = %s
+                    SET vacancy_name = %s, vacancy_num = %s, vacancy_date = %s, vacancy_file = %s
                     WHERE vacancy_id = %s;
                 """, (name, num, date, file_path, vacancy_id))
             conn.commit()
@@ -788,3 +789,64 @@ class Database:
             return "Неизвестно"
         finally:
             self.release_connection(conn)
+
+    def save_assessment_results(self, program_id, vacancy_id, similarity_results):
+        """Сохранение результатов в таблицу assessment в невзвешенном формате."""
+        if not similarity_results:
+            logging.error("Нет данных для сохранения!")
+            return False
+
+        try:
+            assessment_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+            conn = self.get_connection()
+            with conn.cursor() as cursor:
+                for competence, (score, type_competence) in similarity_results.items():
+                    competence_data = self.fetch_competence_by_name(competence)
+                    if not competence_data:
+                        logging.error(f"Компетенция '{competence}' не найдена!")
+                        continue
+                    competence_id, _, type_competence_id = competence_data
+
+                    if not self.ensure_competence_program_link(competence_id, type_competence_id, program_id):
+                        logging.error(f"Не удалось создать связь для '{competence}'")
+                        continue
+
+                    cursor.execute("""
+                        INSERT INTO public.assessment (
+                            competence_id, type_competence_id, educational_program_id, vacancy_id,
+                            assessment_date, value
+                        ) VALUES (%s, %s, %s, %s, %s, %s)
+                        RETURNING assessment_id;
+                    """, (competence_id, type_competence_id, program_id, vacancy_id, assessment_date, float(score)))
+                    assessment_id = cursor.fetchone()[0]
+                    logging.info(f"Сохранена оценка ID: {assessment_id} для '{competence}' со значением {score:.6f} (невзвешенное)")
+                conn.commit()
+            logging.info("Результаты успешно сохранены в таблице assessment.")
+            return True
+        except Error as e:
+            conn.rollback()
+            logging.error(f"Ошибка сохранения результатов: {e}", exc_info=True)
+            return False
+        finally:
+            self.release_connection(conn)
+
+    def get_competence_types(self, competence_ids):
+        """Получение типов компетенций по их ID."""
+        try:
+            if not competence_ids:
+                return []
+            query = """
+                SELECT c.competence_id, tc.type_competence_full_name
+                FROM competence c
+                JOIN type_competence tc ON c.type_competence_id = tc.type_competence_id
+                WHERE c.competence_id IN %s;
+            """
+            conn = self.get_connection()
+            with conn.cursor() as cursor:
+                cursor.execute(query, (tuple(competence_ids),))
+                types = dict(cursor.fetchall())
+            self.release_connection(conn)
+            return [types.get(cid, "Неизвестно") for cid in competence_ids]
+        except Error as e:
+            logging.error(f"Ошибка получения типов компетенций: {e}")
+            return ["Неизвестно"] * len(competence_ids)

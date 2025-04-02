@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext
 from datetime import datetime
 from .assessment_history_tab import refresh_history_tables
-from moduls.table_sort import sort_treeview_column, sort_competence_type_column  
+from moduls.table_processing import sort_treeview_column, sort_competence_type_column, add_tooltip_to_treeview
 import logging
 from gui.graph_tab import load_graph_program_table  
 
@@ -16,17 +16,11 @@ def create_assessment_tab(frame, app):
     app.run_button = tk.Button(run_frame, text="Запустить анализ", command=app.start_analysis)
     app.run_button.pack(side="left", padx=5)
 
-
-
     app.save_results_button = tk.Button(run_frame, text="Сохранить результаты в историю", command=lambda: save_assessment_results(app))
     app.save_results_button.pack(side=tk.LEFT, padx=5)
 
     control_frame = tk.Frame(main_frame)
     control_frame.pack(pady=4, fill="x")
-
-    # Кнопка "Обновить"
-    # app.refresh_button = tk.Button(control_frame, text="Обновить", command=lambda: update_weights(app))
-    # app.refresh_button.pack(side="left", padx=5)
 
     threshold_frame = ttk.LabelFrame(control_frame, text="Настройки")
     threshold_frame.pack(side="left", padx=5, pady=5)
@@ -108,6 +102,8 @@ def create_assessment_tab(frame, app):
     app.skill_results_table.column("score", width=80)
     app.skill_results_table.pack(pady=4, fill="x")
 
+    add_tooltip_to_treeview(app.skill_results_table)
+
     app.export_button = tk.Button(run_frame, text="Экспорт в Excel", command=lambda: app.logic.export_results_to_excel(app))
     app.export_button.pack(side=tk.LEFT, padx=5)
 
@@ -153,7 +149,7 @@ def update_weights(app):
     app.group_scores_area.insert(tk.END, f"\nОбщая оценка программы: {overall_score:.6f}\n")
 
 def save_assessment_results(app):
-    """Сохранение результатов в таблицу assessment в невзвешенном формате (веса = 1/3)."""
+    """Сохранение результатов анализа в базу данных."""
     if not hasattr(app.logic, "results") or not app.logic.results:
         app.show_error("Сначала выполните анализ!")
         return
@@ -163,40 +159,10 @@ def save_assessment_results(app):
         app.show_error("Нет данных для сохранения!")
         return
 
-    try:
-        assessment_date = datetime.now().strftime("%Y-%m-%d %H:%M")
-        conn = app.logic.db.get_connection()
-        with conn.cursor() as cursor:
-            for competence, (score, type_competence) in results.items():
-                competence_data = app.logic.db.fetch_competence_by_name(competence)
-                if not competence_data:
-                    logging.error(f"Компетенция '{competence}' не найдена!")
-                    continue
-                competence_id, _, type_competence_id = competence_data
-
-                if not app.logic.db.ensure_competence_program_link(competence_id, type_competence_id, app.program_id):
-                    logging.error(f"Не удалось создать связь для '{competence}'")
-                    continue
-
-                cursor.execute("""
-                    INSERT INTO public.assessment (
-                        competence_id, type_competence_id, educational_program_id, vacancy_id,
-                        assessment_date, value
-                    ) VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING assessment_id;
-                """, (competence_id, type_competence_id, app.program_id, app.selected_vacancy_id, assessment_date, float(score)))
-                assessment_id = cursor.fetchone()[0]
-                logging.info(f"Сохранена оценка ID: {assessment_id} для '{competence}' со значением {score:.6f} (невзвешенное)")
-            conn.commit()
+    success = app.logic.db.save_assessment_results(app.program_id, app.selected_vacancy_id, results)
+    if success:
         app.show_info("Результаты сохранены в таблице assessment в невзвешенном формате!")
-    except Exception as e:
-        app.show_error(f"Ошибка сохранения: {e}")
-        logging.error(f"Ошибка сохранения результатов: {e}", exc_info=True)
-        if "conn" in locals():
-            conn.rollback()
-    finally:
-        if "conn" in locals():
-            app.logic.db.release_connection(conn)
-
-    refresh_history_tables(app)
-    load_graph_program_table(app)
+        refresh_history_tables(app)
+        load_graph_program_table(app)
+    else:
+        app.show_error("Ошибка при сохранении результатов в базу данных!")

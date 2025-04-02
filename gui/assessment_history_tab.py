@@ -3,7 +3,7 @@ import numpy as np
 from tkinter import ttk, scrolledtext
 import logging
 from moduls.export_to_excel import ExcelExporter
-from moduls.table_sort import sort_treeview_column, sort_competence_type_column  
+from moduls.table_processing import sort_treeview_column, sort_competence_type_column, add_tooltip_to_treeview
 from gui.graph_tab import load_graph_program_table  
 
 def create_rating_history_tab(frame, app):
@@ -78,6 +78,8 @@ def create_rating_history_tab(frame, app):
     app.program_vacancy_history_table.pack(fill="both", expand=True)
     app.program_vacancy_history_table.bind("<<TreeviewSelect>>", lambda event: update_competence_history_table(app))
 
+    add_tooltip_to_treeview(app.program_vacancy_history_table)
+
     competence_frame = tk.LabelFrame(main_frame, text="Оценка компетенций образовательной программы")
     competence_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
@@ -89,6 +91,8 @@ def create_rating_history_tab(frame, app):
     app.competence_history_table.column("competence_type", width=160)
     app.competence_history_table.column("score", width=50)
     app.competence_history_table.pack(fill="both", expand=True)
+
+    add_tooltip_to_treeview(app.competence_history_table)
 
     results_container = tk.Frame(main_frame)
     results_container.pack(pady=4, fill="both", expand=False)
@@ -144,7 +148,7 @@ def load_program_vacancy_history_table(app):
             app.program_vacancy_history_table.insert("", tk.END, values=(program_name, university_short, year, vacancy_name, assessment_date_str))
         if app.program_vacancy_history_table.get_children():
             app.program_vacancy_history_table.selection_set(app.program_vacancy_history_table.get_children()[0])
-            update_competence_history_table(app)
+            update_competence_history_table(app)        
     except Exception as e:
         app.show_error(f"Ошибка при загрузке данных: {e}")
         logging.error(f"Ошибка загрузки данных из assessment: {e}", exc_info=True)
@@ -166,6 +170,7 @@ def update_competence_history_table(app):
         for row in rows:
             app.competence_history_table.insert("", tk.END, values=(row[0], row[1], f"{row[2]:.6f}"))
         update_group_scores(app)
+        sort_competence_type_column(app.competence_history_table, "competence_type")
     except Exception as e:
         app.show_error(f"Ошибка загрузки компетенций: {e}")
         logging.error(f"Ошибка обновления таблицы компетенций: {e}", exc_info=True)

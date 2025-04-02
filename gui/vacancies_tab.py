@@ -5,7 +5,7 @@ from moduls.labor_market_data import LaborMarketData
 from datetime import datetime
 import os
 from concurrent.futures import ThreadPoolExecutor
-from moduls.table_sort import sort_treeview_column  
+from moduls.table_processing import sort_treeview_column, sort_competence_type_column, add_tooltip_to_treeview
 
 def create_vacancies_tab(frame, app):
     app.vac_executor = ThreadPoolExecutor(max_workers=1)
@@ -28,6 +28,8 @@ def create_vacancies_tab(frame, app):
     app.vacancies_table.column("collection_date", width=100)
     app.vacancies_table.column("file", width=250)
     app.vacancies_table.pack(pady=5, fill="both", expand=True)
+
+    add_tooltip_to_treeview(app.vacancies_table)
 
     button_frame = tk.Frame(container_frame)
     button_frame.pack(side=tk.LEFT, padx=10, fill="y")

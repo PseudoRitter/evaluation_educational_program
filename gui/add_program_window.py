@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext
 import logging
 import re
-from moduls.table_sort import sort_treeview_column, sort_competence_type_column  
+from moduls.table_processing import sort_treeview_column, sort_competence_type_column, add_tooltip_to_treeview
 
 def create_add_program_window(root, app):
     """Создание окна для добавления образовательной программы."""
@@ -90,6 +90,8 @@ def create_university_section(parent_frame, app, window):
     app.university_table.column("city", width=70)
     app.university_table.pack(pady=2, fill="both", expand=True)
 
+    add_tooltip_to_treeview(app.university_table)
+
     button_frame = tk.Frame(container)
     button_frame.pack(side=tk.LEFT, padx=2, pady=4, fill="y")
     tk.Button(button_frame, text="Добавить", command=lambda: edit_entity_window(app, window, "university", "добавить")).pack(pady=4)
@@ -121,6 +123,8 @@ def create_program_section(parent_frame, app, window):
     app.program_table.pack(pady=2, fill="both", expand=True)
     app.program_table.bind("<<TreeviewSelect>>", lambda event: on_program_table_select(app))
 
+    add_tooltip_to_treeview(app.program_table)
+
     button_frame = tk.Frame(container)
     button_frame.pack(side=tk.LEFT, padx=2, pady=2, fill="y")
     tk.Button(button_frame, text="Добавить", command=lambda: edit_entity_window(app, window, "program", "добавить")).pack(pady=4)
@@ -147,6 +151,8 @@ def create_competence_section(parent_frame, app, window):
     app.competence_table_add.column("competence", width=430)
     app.competence_table_add.column("competence_type", width=70)
     app.competence_table_add.pack(pady=2, fill="both", expand=True)
+
+    add_tooltip_to_treeview(app.competence_table_add)
 
     button_frame = tk.Frame(container)
     button_frame.pack(side=tk.LEFT, padx=4, pady=2, fill="y")

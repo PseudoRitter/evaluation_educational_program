@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import numpy as np
-from moduls.table_sort import sort_treeview_column, sort_competence_type_column
+from moduls.table_processing import sort_treeview_column, sort_competence_type_column, add_tooltip_to_treeview
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -46,12 +46,13 @@ def create_comparison_op_vacancies_tab(frame, app):
     app.graph_program_table.heading("program_code", text="Код", command=lambda: sort_treeview_column(app.graph_program_table, "program_code"))
     app.graph_program_table.heading("university", text="ВУЗ", command=lambda: sort_treeview_column(app.graph_program_table, "university"))
     app.graph_program_table.heading("year", text="Год", command=lambda: sort_treeview_column(app.graph_program_table, "year"))
-    
     app.graph_program_table.column("program_name", width=300)
     app.graph_program_table.column("program_code", width=100)
     app.graph_program_table.column("university", width=150)
     app.graph_program_table.column("year", width=50)
     
+    add_tooltip_to_treeview(app.graph_program_table)
+
     app.graph_program_table.bind("<<TreeviewSelect>>", lambda event: on_program_select(app))
     
     app.vacancy_frame = ttk.LabelFrame(frame, text="Выберите вакансии")
@@ -59,13 +60,13 @@ def create_comparison_op_vacancies_tab(frame, app):
     
     vacancy_columns = ("vacancy_name", "assessment_date")
     app.vacancy_table = ttk.Treeview(app.vacancy_frame, columns=vacancy_columns, show="headings", selectmode="extended", height=5)
-    app.vacancy_table.pack(fill="both", expand=True, padx=5, pady=5)
-    
+    app.vacancy_table.pack(fill="both", expand=True, padx=5, pady=5)   
     app.vacancy_table.heading("vacancy_name", text="Название вакансии", command=lambda: sort_treeview_column(app.vacancy_table, "vacancy_name"))
     app.vacancy_table.heading("assessment_date", text="Дата оценки", command=lambda: sort_treeview_column(app.vacancy_table, "assessment_date"))
-    
     app.vacancy_table.column("vacancy_name", width=300)
     app.vacancy_table.column("assessment_date", width=200)
+
+    add_tooltip_to_treeview(app.vacancy_table)
     
     app.graph_button = ttk.Button(frame, text="Отобразить график", command=lambda: display_graph_op_vacancies(app))
     app.graph_button.pack(pady=5)
@@ -185,27 +186,28 @@ def create_comparison_vacancies_op_tab(frame, app):
     columns = ("vacancy_name",)
     app.graph_vacancy_table = ttk.Treeview(vacancy_frame, columns=columns, show="headings", height=5)
     app.graph_vacancy_table.pack(fill="both", expand=True, padx=5, pady=5)
-    
     app.graph_vacancy_table.heading("vacancy_name", text="Название вакансии", command=lambda: sort_treeview_column(app.graph_vacancy_table, "vacancy_name"))
     app.graph_vacancy_table.column("vacancy_name", width=450)
     app.graph_vacancy_table.bind("<<TreeviewSelect>>", lambda event: on_vacancy_select(app))
-    
+
+    add_tooltip_to_treeview(app.graph_vacancy_table)
+
     app.program_frame = ttk.LabelFrame(frame, text="Выберите образовательные программы")
     app.program_frame.pack(fill="both", expand=True, padx=10, pady=5)
     
     program_columns = ("program_name", "program_code", "university", "year")
     app.program_table = ttk.Treeview(app.program_frame, columns=program_columns, show="headings", selectmode="extended", height=5)
-    app.program_table.pack(fill="both", expand=True, padx=5, pady=5)
-    
+    app.program_table.pack(fill="both", expand=True, padx=5, pady=5)  
     app.program_table.heading("program_name", text="Название ОП", command=lambda: sort_treeview_column(app.program_table, "program_name"))
     app.program_table.heading("program_code", text="Код", command=lambda: sort_treeview_column(app.program_table, "program_code"))
     app.program_table.heading("university", text="ВУЗ", command=lambda: sort_treeview_column(app.program_table, "university"))
     app.program_table.heading("year", text="Год", command=lambda: sort_treeview_column(app.program_table, "year"))
-    
     app.program_table.column("program_name", width=300)
     app.program_table.column("program_code", width=100)
     app.program_table.column("university", width=150)
     app.program_table.column("year", width=50)
+
+    add_tooltip_to_treeview(app.program_table)
     
     app.graph_button_vacancies = ttk.Button(frame, text="Отобразить график", command=lambda: display_graph_vacancies_op(app))
     app.graph_button_vacancies.pack(pady=5)
@@ -340,14 +342,14 @@ def create_frequency_tab(frame, app):
     columns = ("competence", "competence_type", "number")
     app.competence_frequency_table = ttk.Treeview(competence_frame, columns=columns, show="headings", height=5)
     app.competence_frequency_table.pack(fill="both", expand=True, padx=5, pady=5)
-
     app.competence_frequency_table.heading("competence", text="Компетенция")
     app.competence_frequency_table.heading("competence_type", text="Вид компетенции", command=lambda: sort_competence_type_column(app.competence_frequency_table, "competence_type"))
     app.competence_frequency_table.heading("number", text="Порядковый номер")
-
     app.competence_frequency_table.column("competence", width=650)
     app.competence_frequency_table.column("competence_type", width=150)
     app.competence_frequency_table.column("number", width=100)
+
+    add_tooltip_to_treeview(app.competence_frequency_table)
 
     display_button = ttk.Button(frame, text="обновить", command=lambda: load_competence_frequency_table(app))
     display_button.pack(pady=10)
