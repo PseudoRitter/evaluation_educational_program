@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 import logging
-import re
 from moduls.table_processing import sort_treeview_column, sort_competence_type_column, add_tooltip_to_treeview
 
 def create_add_program_window(root, app):
@@ -343,10 +342,13 @@ def save_university(app, values, old_values, action):
             app.universities = app.logic.db.fetch_universities()
             logging.info(f"ВУЗ '{full_name}' добавлен!")
     else:
-        university_id = app.logic.db.fetch_university_id_by_details(*old_values)[0]
-        if app.logic.db.update_university(university_id, full_name, short_name, city):
+        # Убираем лишнее индексирование [0], так как fetch_university_id_by_details возвращает int или None
+        university_id = app.logic.db.fetch_university_id_by_details(*old_values)
+        if university_id and app.logic.db.update_university(university_id, full_name, short_name, city):
             app.universities = app.logic.db.fetch_universities()
             logging.info(f"ВУЗ обновлён: {full_name}")
+        else:
+            logging.error(f"Не удалось найти университет для обновления: {old_values}")
 
 def save_program(app, values, old_values, action):
     """Сохранение данных образовательной программы."""
@@ -357,7 +359,8 @@ def save_program(app, values, old_values, action):
         logging.error("ВУЗ или тип программы не найден!")
         return
 
-    university_id, type_program_id = university[0], type_program[0]
+    university_id = university[0]  # Кортеж, берем первый элемент
+    type_program_id = type_program  # Уже int или None, индексация не нужна
     if action == "добавить":
         program_id = app.logic.db.save_educational_program(name, code, university_id, year, type_program_id, [])
         if program_id:
@@ -389,45 +392,46 @@ def save_competence(app, values, old_values, action):
         return
 
     conn = app.logic.db.get_connection()
+    cursor = conn.cursor()  # Создаем курсор вручную
     try:
-        with conn.cursor() as cursor:
-            if action == "добавить":
-                competence = app.logic.db.fetch_competence_by_name(competence_name)
-                competence_id = app.logic.db.save_competence(competence_name, type_id) if not competence else competence[0]
-                cursor.execute("""
-                    INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
-                    VALUES (%s, %s, %s);
-                """, (competence_id, type_id, app.selected_program_id))
-                logging.info(f"Компетенция '{competence_name}' добавлена!")
-            else:
-                old_competence_name = old_values[0]
-                old_competence = app.logic.db.fetch_competence_by_name(old_competence_name)
-                if not old_competence:
-                    logging.error(f"Компетенция '{old_competence_name}' не найдена!")
-                    return
-                competence_id = old_competence[0]
-                cursor.execute("""
-                    UPDATE competence
-                    SET competence_name = %s, type_competence_id = %s
-                    WHERE competence_id = %s;
-                """, (competence_name, type_id, competence_id))
-                cursor.execute("""
-                    DELETE FROM competence_educational_program 
-                    WHERE competence_id = %s AND type_competence_id = %s AND educational_program_id = %s;
-                """, (competence_id, old_competence[2], app.selected_program_id))
-                cursor.execute("""
-                    INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
-                    VALUES (%s, %s, %s);
-                """, (competence_id, type_id, app.selected_program_id))
-                logging.info(f"Компетенция '{competence_name}' обновлена!")
+        if action == "добавить":
+            competence = app.logic.db.fetch_competence_by_name(competence_name)
+            competence_id = app.logic.db.save_competence(competence_name, type_id) if not competence else competence[0]
+            cursor.execute("""
+                INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
+                VALUES (?, ?, ?);
+            """, (competence_id, type_id, app.selected_program_id))
+            logging.info(f"Компетенция '{competence_name}' добавлена!")
+        else:
+            old_competence_name = old_values[0]
+            old_competence = app.logic.db.fetch_competence_by_name(old_competence_name)
+            if not old_competence:
+                logging.error(f"Компетенция '{old_competence_name}' не найдена!")
+                return
+            competence_id = old_competence[0]
+            cursor.execute("""
+                UPDATE competence
+                SET competence_name = ?, type_competence_id = ?
+                WHERE competence_id = ?;
+            """, (competence_name, type_id, competence_id))
+            cursor.execute("""
+                DELETE FROM competence_educational_program 
+                WHERE competence_id = ? AND type_competence_id = ? AND educational_program_id = ?;
+            """, (competence_id, old_competence[2], app.selected_program_id))
+            cursor.execute("""
+                INSERT INTO competence_educational_program (competence_id, type_competence_id, educational_program_id)
+                VALUES (?, ?, ?);
+            """, (competence_id, type_id, app.selected_program_id))
+            logging.info(f"Компетенция '{competence_name}' обновлена!")
         conn.commit()
     except Exception as e:
         conn.rollback()
         logging.error(f"Ошибка при сохранении компетенции: {e}")
-        raise  # Повторно вызываем исключение, чтобы `save_entity` обработал его
+        raise
     finally:
+        cursor.close()  # Закрываем курсор вручную
         app.logic.db.release_connection(conn)
-
+        
 def delete_entity(app, parent_window, entity_type):
     """Удаление сущности из базы данных."""
     table_map = {"university": app.university_table, "program": app.program_table, "competence": app.competence_table_add}
@@ -440,10 +444,13 @@ def delete_entity(app, parent_window, entity_type):
     values = table.item(selected_item[0])["values"]
     try:
         if entity_type == "university":
-            university_id = app.logic.db.fetch_university_id_by_details(*values)[0]
-            if app.logic.db.delete_university(university_id):
+            # Убираем [0], так как fetch_university_id_by_details возвращает int или None
+            university_id = app.logic.db.fetch_university_id_by_details(*values)
+            if university_id and app.logic.db.delete_university(university_id):
                 app.universities = app.logic.db.fetch_universities()
                 logging.info(f"ВУЗ '{values[0]}' удалён!")
+            else:
+                logging.error(f"Не удалось найти университет для удаления: {values}")
         elif entity_type == "program":
             name, code, year, university_short = values[0], values[1], values[2], values[3]
             university = app.logic.db.fetch_university_by_short_name(university_short)
@@ -466,13 +473,9 @@ def delete_entity(app, parent_window, entity_type):
                 logging.info(f"Компетенция '{values[0]}' удалена!")
 
         if entity_type == "program":
-            from .education_tab import sync_program_tables  # Локальный импорт
+            from .education_tab import sync_program_tables
             sync_program_tables(app)
         else:
             load_tables(app)
     except Exception as e:
         logging.error(f"Ошибка удаления {entity_type}: {e}")
-
-def validate(possible_new_value):
-    """Проверка ввода на соответствие шестнадцатеричному формату."""
-    return bool(re.match(r"^[0-9a-fA-F]*$", possible_new_value))

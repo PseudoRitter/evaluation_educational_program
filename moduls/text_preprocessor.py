@@ -3,7 +3,6 @@ import torch
 import numpy as np
 import gc
 import logging
-import spacy
 import os
 import re
 from transformers import AutoTokenizer, AutoModelForSequenceClassification

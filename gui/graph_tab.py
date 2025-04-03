@@ -6,8 +6,6 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import numpy as np
 from moduls.table_processing import sort_treeview_column, sort_competence_type_column, add_tooltip_to_treeview
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 COLORS = ["#FFA500", "#0000FF", "#008000", "#FF0000"]  # Оранжевый, синий, зелёный, красный
 MAX_COMPETENCES = 3
@@ -163,7 +161,7 @@ def display_graph_op_vacancies(app):
     ax.set_ylim(y_min, y_max)
     ax.set_xticks(offsets[n_bars // 2::n_bars])
     ax.set_xticklabels([d["name"] for d in vacancy_data], rotation=45, ha="right")
-    ax.set_ylabel("Оценка")
+    app.ylabel("Оценка")
     
     legend_labels = competence_types + ["Средняя оценка"]
     ax.legend(labels=legend_labels, handles=[plt.Rectangle((0, 0), 1, 1, color=COLORS[j % len(COLORS)]) 
@@ -387,25 +385,6 @@ def display_frequency_histogram(app):
 
     plot_frequency_histogram(histogram_window, competences, frequencies)
 
-def plot_frequency_histogram(window, competences, frequencies):
-    """Построение гистограммы частот в новом окне."""
-    numbers = [comp["number"] for comp in competences]
-    freq_values = [frequencies.get(comp["competence"], 0) for comp in competences]
-
-    logging.debug(f"Порядковые номера для гистограммы: {numbers}")
-    logging.debug(f"Частоты для гистограммы: {freq_values}")
-
-    fig = Figure(figsize=(10, len(numbers) * 0.4))
-    ax = fig.add_subplot(111)
-    ax.barh(numbers, freq_values, color='skyblue')
-    ax.set_xlabel("Частота упоминания")
-    ax.set_ylabel("Порядковый номер компетенции")
-    ax.set_title("Частота упоминания компетенций в вакансиях (сходство > 0.5)")
-
-    canvas = FigureCanvasTkAgg(fig, master=window)
-    canvas.draw()
-    canvas.get_tk_widget().pack(fill="both", expand=True)
-
 def load_competence_frequency_table(app):
     """Загрузка компетенций в таблицу на вкладке 'Гистограмма частот' с сортировкой и нумерацией."""
     app.competence_frequency_table.delete(*app.competence_frequency_table.get_children())
@@ -484,6 +463,7 @@ def plot_frequency_histogram(window, competences, frequencies):
     ax.set_xlabel("Частота упоминания")
     ax.set_ylabel("Порядковый номер компетенции")
     ax.set_title("Частота упоминания компетенций в вакансиях (сходство > 0.5)")
+    ax.invert_yaxis()
 
     # Устанавливаем пределы оси X: от 0 до N + 10, где N — максимальная частота
     max_freq = max(freq_values) if freq_values else 0  # Проверка на случай пустого списка
@@ -495,11 +475,6 @@ def plot_frequency_histogram(window, competences, frequencies):
         width = bar.get_width()  # Длина столбца
         y_pos = bar.get_y() + bar.get_height() / 2  # Центр столбца по вертикали
         ax.text(width, y_pos, str(freq), ha="left", va="center", fontsize=10)
-        # Если столбец слишком короткий (< 5), размещаем значение справа, иначе внутри
-        # if width < 5:
-        #     ax.text(width, y_pos, str(freq), ha="left", va="center", fontsize=10)
-        # else:
-        #     ax.text(width, y_pos, str(freq), ha="right", va="center", fontsize=10, color="white")
 
     # Создаем легенду
     from matplotlib.patches import Patch

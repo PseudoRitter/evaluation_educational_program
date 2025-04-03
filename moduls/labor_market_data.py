@@ -2,8 +2,6 @@ import requests
 import json
 import time
 import logging
-from datetime import datetime
-
 
 class LaborMarketData:
     def __init__(self, query: str, access_token: str, max_vacancies_per_experience=2000):

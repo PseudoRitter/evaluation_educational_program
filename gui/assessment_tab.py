@@ -1,9 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext
-from datetime import datetime
 from .assessment_history_tab import refresh_history_tables
 from moduls.table_processing import sort_treeview_column, sort_competence_type_column, add_tooltip_to_treeview
-import logging
 from gui.graph_tab import load_graph_program_table  
 
 def create_assessment_tab(frame, app):

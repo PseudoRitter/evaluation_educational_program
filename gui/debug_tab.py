@@ -1,6 +1,5 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext
-import re
 
 def create_debug_tab(frame, app):
     """Создание вкладки отладки для отображения результатов классификации и анализа."""
@@ -30,7 +29,3 @@ def create_debug_tab(frame, app):
 
     app.result_text_area = scrolledtext.ScrolledText(frame, width=120, height=5)
     app.result_text_area.pack()
-
-def validate(possible_new_value):
-    """Проверка ввода на соответствие шестнадцатеричному формату."""
-    return bool(re.match(r"^[0-9a-fA-F]*$", possible_new_value))

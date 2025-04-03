@@ -18,14 +18,8 @@ class Logic:
         self.results = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.batch_size = batch_size  
-        self.db_params = {
-            "database": "postgres",
-            "user": "postgres",
-            "password": "1111",
-            "host": "localhost",
-            "port": "5432"
-        }
-        self.db = Database(self.db_params, data_dir="vacancies_hh")
+        # Убираем db_params для PostgreSQL, указываем путь к SQLite
+        self.db = Database(db_path="assessment_database.db", data_dir="vacancies_hh")
         self.preprocessor = TextPreprocessor()  
         self.matcher = SkillMatcher(device=self.device)
         self.executor = ThreadPoolExecutor(max_workers=4)
@@ -161,21 +155,21 @@ class Logic:
             }
             frequencies = results["frequencies"]
             group_scores = self.calculate_competence_group_scores(skills_with_types, results["sentence_transformer"].values())
-            overall_score = self.calculate_overall_score(group_scores, use_weights, weights or {
+            overall_score, weighted_group_scores = self.calculate_overall_score(group_scores, use_weights, weights or {
                 "Универсальная компетенция": 0.2,
                 "Общепрофессиональная компетенция": 0.4,
                 "Профессиональная компетенция": 0.4
             })
 
             self.results = {
-                "similarity_results": similarity_results,
-                "frequencies": frequencies,
-                "group_scores": group_scores,
-                "overall_score": overall_score,
-                "original_texts": original_texts,
-                "tokenized_texts": tokenized_texts,
-                "filtered_texts": filtered_texts,
-                "classification_results": classified_results
+            "similarity_results": similarity_results,
+            "frequencies": frequencies,
+            "group_scores": weighted_group_scores if use_weights else group_scores,  # Сохраняем group_scores отдельно
+            "overall_score": overall_score,  # Сохраняем только число
+            "original_texts": original_texts,
+            "tokenized_texts": tokenized_texts,
+            "filtered_texts": filtered_texts,
+            "classification_results": classified_results
             }
 
             return self.results
@@ -200,7 +194,3 @@ class Logic:
         
         exporter = ExcelExporter(self.results, program_name=selected_program, vacancy_name=selected_vacancy)
         exporter.export_to_excel()
-
-    def validate(self, possible_new_value):
-        """Проверка ввода на соответствие шестнадцатеричному формату."""
-        return bool(re.match(r"^[0-9a-fA-F]*$", possible_new_value))

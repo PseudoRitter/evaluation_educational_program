@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
 import logging
-import re
 from concurrent.futures import ThreadPoolExecutor
 from .education_tab import create_education_tab
 from .vacancies_tab import create_vacancies_tab
@@ -185,6 +184,3 @@ class App:
         except Exception as e:
             logging.error(f"Ошибка обновления классификации: {e}", exc_info=True)
             self.show_error(f"Ошибка классификации: {e}")
-
-    def validate(self, possible_new_value):
-        return bool(re.match(r"^[0-9a-fA-F]*$", possible_new_value))
