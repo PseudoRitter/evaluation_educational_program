@@ -18,7 +18,6 @@ class Logic:
         self.results = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.batch_size = batch_size  
-        # Убираем db_params для PostgreSQL, указываем путь к SQLite
         self.db = Database(db_path="assessment_database.db", data_dir="vacancies_hh")
         self.preprocessor = TextPreprocessor()  
         self.matcher = SkillMatcher(device=self.device)
@@ -134,7 +133,9 @@ class Logic:
             tokenized_texts = "\n".join(tokenized_texts)
             filtered_texts = "\n".join(filtered_texts)
 
+            # Этап 1: Классификация и фильтрация предложений
             gui.show_info("Шаг 1: Классификация и фильтрация предложений...")
+            gui.update_status("Классификация предложений")  # Обновляем статус
             classified_results, filtered_sentences = preprocessor.classify_sentences(
                 filtered_texts.split("\n"), batch_size=self.batch_size, exclude_category_label=1  
             )
@@ -147,7 +148,9 @@ class Logic:
                 gc.collect()
                 torch.cuda.empty_cache()
             
+            # Этап 2: Оценка соответствия компетенций
             gui.show_info("Шаг 2: Оценка соответствия компетенций...")
+            gui.update_status("Оценка соответствия предложений")  # Обновляем статус
             matcher = SkillMatcher(device=device)
             results = matcher.match_skills(skills, filtered_texts.split("\n"), self.batch_size, threshold)  
             similarity_results = {
@@ -162,14 +165,14 @@ class Logic:
             })
 
             self.results = {
-            "similarity_results": similarity_results,
-            "frequencies": frequencies,
-            "group_scores": weighted_group_scores if use_weights else group_scores,  # Сохраняем group_scores отдельно
-            "overall_score": overall_score,  # Сохраняем только число
-            "original_texts": original_texts,
-            "tokenized_texts": tokenized_texts,
-            "filtered_texts": filtered_texts,
-            "classification_results": classified_results
+                "similarity_results": similarity_results,
+                "frequencies": frequencies,
+                "group_scores": weighted_group_scores if use_weights else group_scores,
+                "overall_score": overall_score,
+                "original_texts": original_texts,
+                "tokenized_texts": tokenized_texts,
+                "filtered_texts": filtered_texts,
+                "classification_results": classified_results
             }
 
             return self.results
@@ -185,8 +188,8 @@ class Logic:
                     matcher.model.to("cpu")
                 del preprocessor
                 gc.collect()
-                torch.cuda.empty_cache()         
-            tk.messagebox.showinfo(title="Информация", message="Оценка завершена!")
+                torch.cuda.empty_cache()
+            # tk.messagebox.showinfo(title="Информация", message="Оценка завершена!")        
 
     def export_results_to_excel(self, app):
         selected_program = app.selected_program_label.cget("text").replace("Выбрана программа: ", "")

@@ -67,6 +67,13 @@ def create_assessment_tab(frame, app):
     app.prof_weight_entry.insert(0, "0.4")
     app.prof_weight_entry.pack(side="left", padx=5)
 
+    status_frame = ttk.LabelFrame(control_frame, text="Статус анализа")
+    status_frame.pack(side="left", padx=5, pady=5)
+    
+    # Добавляем Label для отображения статуса
+    app.status_label = ttk.Label(status_frame, text="Не запущен")
+    app.status_label.pack(side="left", padx=5)
+
     def validate_weight(value):
         if value == "":
             return True

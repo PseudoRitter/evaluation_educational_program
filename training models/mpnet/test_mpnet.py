@@ -22,8 +22,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Путь к модели
-#model_path = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"  # или укажите локальный путь
-model_path = "C:/python-models/tuned_model_mpnet_v20"
+model_path = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"  # или укажите локальный путь
+#model_path = "C:/python-models/tuned_model_mpnet_v22"
 
 # Загрузка модели
 try:

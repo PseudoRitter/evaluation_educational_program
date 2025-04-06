@@ -11,11 +11,11 @@ from .graph_tab import create_graph_tab
 from moduls.table_processing import sort_treeview_column, sort_competence_type_column
 
 class App:
-    def __init__(self, root, logic, batch_size):  # Добавляем batch_size
+    def __init__(self, root, logic, batch_size):
         """Инициализация приложения с главным окном и логикой."""
         self.root = root
         self.logic = logic
-        self.batch_size = batch_size  # Сохраняем batch_size как атрибут
+        self.batch_size = batch_size
         self.last_selected_program_data = None
         self.root.title("Оценка соответствия образовательной программы")
         self.root.geometry("1100x800")
@@ -81,6 +81,14 @@ class App:
             logging.error(f"Ошибка загрузки вакансий: {e}")
             self.show_error(f"Не удалось загрузить вакансии: {e}")
 
+    def update_status(self, status_text):
+        """Обновление текста статуса в status_label в главном потоке."""
+        def set_status():
+            if hasattr(self, 'status_label'):
+                self.status_label.config(text=status_text)
+            self.root.update_idletasks()  # Обновляем GUI немедленно
+        self.root.after(0, set_status)  # Выполняем в главном потоке
+
     def start_analysis(self):
         """Запуск анализа соответствия программы и вакансии с учетом весов."""
         if not self.program_id or not self.selected_vacancy_id:
@@ -113,6 +121,7 @@ class App:
 
             logging.debug(f"Запуск анализа с порогом: {threshold}, использование весов: {use_weights}, веса: {weights}")
             self.show_info("Запуск анализа...")
+            self.update_status("Классификация предложений")  # Начало анализа
             future = self.executor.submit(self.logic.run_analysis, self.program_id, self.selected_vacancy_id, self, self.batch_size, threshold, use_weights, weights)
             future.add_done_callback(self.on_analysis_complete)
         except ValueError:
@@ -126,17 +135,22 @@ class App:
             results = future.result()
             if not results or "similarity_results" not in results:
                 self.show_error("Анализ не выполнен: данные недоступны")
+                self.update_status("Не запущен")  # Сброс статуса при ошибке
                 return
             self.update_results(results)
+            self.update_status("Анализ завершен")  # Успешное завершение
         except Exception as e:
             logging.error(f"Ошибка анализа: {e}", exc_info=True)
             self.show_error(f"Ошибка: {e}")
+            self.update_status("Не запущен")  # Сброс статуса при ошибке
 
     def show_error(self, message):
         logging.error(f"GUI Error: {message}")
+        # self.root.after(0, lambda: tk.messagebox.showerror("Ошибка", message))
 
     def show_info(self, message):
         logging.info(f"GUI Info: {message}")
+        # self.root.after(0, lambda: tk.messagebox.showinfo("Информация", message))
 
     def update_results(self, results):
         try:
