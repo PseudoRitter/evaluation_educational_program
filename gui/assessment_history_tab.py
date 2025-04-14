@@ -13,8 +13,8 @@ def create_rating_history_tab(frame, app):
     control_frame = tk.Frame(main_frame)
     control_frame.pack(fill="x", padx=5, pady=5)
 
-    refresh_button = ttk.Button(control_frame, text="Обновить", command=lambda: refresh_history_tables(app))
-    refresh_button.pack(side="left", padx=5, pady=5)
+    # refresh_button = ttk.Button(control_frame, text="Обновить", command=lambda: refresh_history_tables(app))
+    # refresh_button.pack(side="left", padx=5, pady=5)
 
     app.history_use_weights_var = tk.BooleanVar(value=False)
     use_weights_check = ttk.Checkbutton(control_frame, text="Использовать веса", variable=app.history_use_weights_var, command=lambda: update_group_scores(app))

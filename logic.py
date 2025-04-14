@@ -73,13 +73,33 @@ class Logic:
         try:
             with open(full_path, "r", encoding="utf-8") as file:
                 vacancies = json.load(file)
-                return [vacancy.get("full_description", "") for vacancy in vacancies]
+                descriptions = [vacancy.get("full_description", "") for vacancy in vacancies]
+                key_skills = [vacancy.get("key_skills", []) for vacancy in vacancies]
+                return descriptions, key_skills
         except Exception as e:
             logging.error(f"Ошибка загрузки описаний из {full_path}: {e}")
-            return []
+            return [], []
+        
+    def calculate_key_skills_frequency(self, key_skills_list):
+        from collections import Counter
+        
+        # Считаем общее количество вакансий с ключевыми навыками
+        total_vacancies_with_skills = sum(1 for skills in key_skills_list if skills)
+        total_vacancies = len(key_skills_list)
+        
+        # Собираем все ключевые навыки
+        all_key_skills = [skill for sublist in key_skills_list for skill in sublist]
+        frequency_counter = Counter(all_key_skills)
+        
+        # Формируем список навыков с количеством и процентами
+        key_skills_data = []
+        for skill, count in frequency_counter.most_common():
+            percentage = (count / total_vacancies_with_skills) if total_vacancies > 0 else 0
+            key_skills_data.append((skill, count, percentage))
+        
+        return total_vacancies_with_skills, key_skills_data
 
     def run_analysis(self, program_id, vacancy_id, gui, batch_size, threshold=0.5, use_weights=False, weights=None):
-        """Запуск анализа соответствия программы и вакансий с учетом весов."""
         try:
             vacancy = self.db.fetch_vacancy_details(vacancy_id)
             if not vacancy:
@@ -95,8 +115,8 @@ class Logic:
                 return {}
             
             logging.debug(f"Загружаем файл: {full_path}")
-            job_descriptions = self.load_vacancy_descriptions_field(full_path)
-            logging.debug(f"Загружено описаний: {len(job_descriptions)}")
+            job_descriptions, key_skills_list = self.load_vacancy_descriptions_field(full_path)
+            logging.debug(f"Загружено описаний: {len(job_descriptions)}, key_skills: {len(key_skills_list)}")
             if not job_descriptions:
                 gui.show_error(f"Файл {full_path} не содержит описаний вакансий!")
                 logging.error(f"Файл {full_path} не содержит описаний вакансий!")
@@ -120,6 +140,9 @@ class Logic:
             filtered_texts = []
 
             for desc in job_descriptions:
+                if gui.stop_analysis_flag:
+                    logging.info("Анализ принудительно остановлен на этапе предобработки.")
+                    return {}
                 clean_html_text = preprocessor.remove_html_tags(desc)
                 clean_header = preprocessor.remove_header(clean_html_text)
                 clean_list_text = preprocessor.remove_list_tags(clean_header)
@@ -133,12 +156,16 @@ class Logic:
             tokenized_texts = "\n".join(tokenized_texts)
             filtered_texts = "\n".join(filtered_texts)
 
-            # Этап 1: Классификация и фильтрация предложений
             gui.show_info("Шаг 1: Классификация и фильтрация предложений...")
-            gui.update_status("Классификация предложений")  # Обновляем статус
+            gui.update_status("Классификация предложений")
+            sentences = filtered_texts.split("\n")
             classified_results, filtered_sentences = preprocessor.classify_sentences(
-                filtered_texts.split("\n"), batch_size=self.batch_size, exclude_category_label=1  
+                sentences, batch_size=self.batch_size, exclude_category_label=1, stop_flag=gui.stop_analysis_flag
             )
+            if gui.stop_analysis_flag:
+                logging.info("Анализ принудительно остановлен во время классификации.")
+                return {}
+            
             logging.debug(f"Классифицировано предложений: {len(classified_results)}")
             gui.update_classification_table(classified_results)
             filtered_texts = "\n".join(filtered_sentences)
@@ -147,12 +174,17 @@ class Logic:
                 logging.info("Кэш GPU очищен после классификации.")
                 gc.collect()
                 torch.cuda.empty_cache()
-            
-            # Этап 2: Оценка соответствия компетенций
+
+            if gui.stop_analysis_flag:
+                logging.info("Анализ принудительно остановлен после классификации.")
+                return {}
+
             gui.show_info("Шаг 2: Оценка соответствия компетенций...")
-            gui.update_status("Оценка соответствия предложений")  # Обновляем статус
-            matcher = SkillMatcher(device=device)
-            results = matcher.match_skills(skills, filtered_texts.split("\n"), self.batch_size, threshold)  
+            gui.update_status("Оценка соответствия предложений")
+            results = self.matcher.match_skills(skills, filtered_texts.split("\n"), batch_size, threshold, stop_flag=gui.stop_analysis_flag)
+            if gui.stop_analysis_flag:
+                logging.info("Анализ принудительно остановлен во время оценки компетенций.")
+                return {}
             similarity_results = {
                 skill: (score, ctype) for skill, score, ctype in zip(skills, results["sentence_transformer"].values(), competence_types)
             }
@@ -164,6 +196,12 @@ class Logic:
                 "Профессиональная компетенция": 0.4
             })
 
+            if gui.stop_analysis_flag:
+                logging.info("Анализ принудительно остановлен перед завершением.")
+                return {}
+
+            total_vacancies_with_skills, key_skills_data = self.calculate_key_skills_frequency(key_skills_list)
+
             self.results = {
                 "similarity_results": similarity_results,
                 "frequencies": frequencies,
@@ -172,7 +210,9 @@ class Logic:
                 "original_texts": original_texts,
                 "tokenized_texts": tokenized_texts,
                 "filtered_texts": filtered_texts,
-                "classification_results": classified_results
+                "classification_results": classified_results,
+                "total_vacancies_with_skills": total_vacancies_with_skills,
+                "key_skills_data": key_skills_data
             }
 
             return self.results
@@ -184,12 +224,11 @@ class Logic:
         finally:
             if hasattr(self, "device") and self.device == "cuda":
                 logging.info("Очистка кэш GPU после завершения анализа...")
-                if "matcher" in locals() and hasattr(matcher, "model"):
-                    matcher.model.to("cpu")
+                if hasattr(self.matcher, "model") and self.matcher.model is not None:
+                    self.matcher.model.to("cpu")
                 del preprocessor
                 gc.collect()
                 torch.cuda.empty_cache()
-            # tk.messagebox.showinfo(title="Информация", message="Оценка завершена!")        
 
     def export_results_to_excel(self, app):
         selected_program = app.selected_program_label.cget("text").replace("Выбрана программа: ", "")

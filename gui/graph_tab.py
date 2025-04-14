@@ -161,7 +161,7 @@ def display_graph_op_vacancies(app):
     ax.set_ylim(y_min, y_max)
     ax.set_xticks(offsets[n_bars // 2::n_bars])
     ax.set_xticklabels([d["name"] for d in vacancy_data], rotation=45, ha="right")
-    app.ylabel("Оценка")
+    ax.set_ylabel("Оценка")  # Исправленная строка
     
     legend_labels = competence_types + ["Средняя оценка"]
     ax.legend(labels=legend_labels, handles=[plt.Rectangle((0, 0), 1, 1, color=COLORS[j % len(COLORS)]) 

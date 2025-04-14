@@ -14,8 +14,14 @@ def create_assessment_tab(frame, app):
     app.run_button = tk.Button(run_frame, text="Запустить анализ", command=app.start_analysis)
     app.run_button.pack(side="left", padx=5)
 
+    app.stop_button = tk.Button(run_frame, text="Принудительная остановка", command=app.stop_analysis)
+    app.stop_button.pack(side="left", padx=5)
+
     app.save_results_button = tk.Button(run_frame, text="Сохранить результаты в историю", command=lambda: save_assessment_results(app))
     app.save_results_button.pack(side=tk.LEFT, padx=5)
+
+    app.export_button = tk.Button(run_frame, text="Экспорт в Excel", command=lambda: app.logic.export_results_to_excel(app))
+    app.export_button.pack(side=tk.LEFT, padx=5)
 
     control_frame = tk.Frame(main_frame)
     control_frame.pack(pady=4, fill="x")
@@ -29,6 +35,8 @@ def create_assessment_tab(frame, app):
     app.threshold_entry = ttk.Entry(threshold_frame, width=10)
     app.threshold_entry.insert(0, "0.5")
     app.threshold_entry.pack(side="left", padx=5)
+
+    app.stop_button.config(state="disabled")
 
     def validate_threshold(value):
         if value == "":
@@ -70,7 +78,6 @@ def create_assessment_tab(frame, app):
     status_frame = ttk.LabelFrame(control_frame, text="Статус анализа")
     status_frame.pack(side="left", padx=5, pady=5)
     
-    # Добавляем Label для отображения статуса
     app.status_label = ttk.Label(status_frame, text="Не запущен")
     app.status_label.pack(side="left", padx=5)
 
@@ -98,7 +105,7 @@ def create_assessment_tab(frame, app):
     skill_results_frame = tk.LabelFrame(results_container, text="Результаты оценки компетенций:")
     skill_results_frame.pack(fill="both", expand=False)
 
-    app.skill_results_table = ttk.Treeview(skill_results_frame, columns=("competence", "competence_type", "score"), show="headings", height=17)
+    app.skill_results_table = ttk.Treeview(skill_results_frame, columns=("competence", "competence_type", "score"), show="headings", height=11)
     app.skill_results_table.heading("competence", text="Компетенция")
     app.skill_results_table.heading("competence_type", text="Вид компетенции", command=lambda: sort_competence_type_column(app.skill_results_table, "competence_type"))
     app.skill_results_table.heading("score", text="Оценка")
@@ -106,15 +113,17 @@ def create_assessment_tab(frame, app):
     app.skill_results_table.column("competence_type", width=120)
     app.skill_results_table.column("score", width=80)
     app.skill_results_table.pack(pady=4, fill="x")
-
     add_tooltip_to_treeview(app.skill_results_table)
 
-    app.export_button = tk.Button(run_frame, text="Экспорт в Excel", command=lambda: app.logic.export_results_to_excel(app))
-    app.export_button.pack(side=tk.LEFT, padx=5)
+    key_skills_frame = tk.LabelFrame(results_container, text="Наиболее популярные ключевые навыки:")
+    key_skills_frame.pack(fill="both", expand=False)
+
+    app.key_skills_area = scrolledtext.ScrolledText(key_skills_frame, width=120, height=10)
+    app.key_skills_area.pack(pady=4, fill="x")
 
     group_scores_frame = tk.LabelFrame(results_container, text="Оценки групп и программы:")
     group_scores_frame.pack(pady=4, fill="both", expand=False)
-    app.group_scores_area = scrolledtext.ScrolledText(group_scores_frame, width=120, height=8)
+    app.group_scores_area = scrolledtext.ScrolledText(group_scores_frame, width=120, height=6)
     app.group_scores_area.pack(pady=4)
 
 def update_weights(app):

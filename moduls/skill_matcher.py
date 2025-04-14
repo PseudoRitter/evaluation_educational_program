@@ -5,7 +5,7 @@ import gc
 import numpy as np
 
 class SkillMatcher:
-    def __init__(self, device="cpu", model_path="C:/python-models/tuned_model_mpnet_v22"): #"sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    def __init__(self, device="cpu", model_path="C:/python-models/tuned_model_mpnet_v22"):
         self.device = device
         self.model_path = model_path
         self.model = None
@@ -24,26 +24,40 @@ class SkillMatcher:
                 logging.error(f"Ошибка загрузки модели: {e}", exc_info=True)
                 raise
 
-    def match_skills(self, program_skills, job_descriptions, batch_size, threshold=0.5):
+    def match_skills(self, program_skills, job_descriptions, batch_size, threshold=0.5, stop_flag=False):
         try:
             if not program_skills or not job_descriptions:
                 logging.warning("Нет данных для анализа навыков.")
                 return {"sentence_transformer": {}, "frequencies": {}}
 
             self._load_model()
-            job_embeddings = self._encode_in_batches(job_descriptions, batch_size)
-            skill_embeddings = self._encode_in_batches(program_skills, batch_size)
+            if stop_flag:
+                logging.info("Анализ принудительно остановлен перед кодированием навыков.")
+                return {"sentence_transformer": {}, "frequencies": {}}
+
+            job_embeddings = self._encode_in_batches(job_descriptions, batch_size, stop_flag)
+            if stop_flag:
+                logging.info("Анализ принудительно остановлен после кодирования описаний вакансий.")
+                return {"sentence_transformer": {}, "frequencies": {}}
+
+            skill_embeddings = self._encode_in_batches(program_skills, batch_size, stop_flag)
+            if stop_flag:
+                logging.info("Анализ принудительно остановлен после кодирования навыков программы.")
+                return {"sentence_transformer": {}, "frequencies": {}}
 
             similarity_results = {}
             frequency_results = {}
             for i in range(0, len(program_skills), batch_size):
+                if stop_flag:
+                    logging.info("Анализ принудительно остановлен во время вычисления сходства.")
+                    return {"sentence_transformer": {}, "frequencies": {}}
                 batch_skills = program_skills[i:i + batch_size]
                 batch_embeddings = skill_embeddings[i:i + batch_size]
                 similarity_matrix = util.pytorch_cos_sim(batch_embeddings, job_embeddings)
                 for j, skill in enumerate(batch_skills):
                     similarities = similarity_matrix[j].cpu().numpy()
                     mean_similarity = similarities.mean().item()
-                    frequency = np.sum(similarities >= threshold)  # Используем настраиваемый порог
+                    frequency = np.sum(similarities >= threshold)
                     similarity_results[skill.strip()] = mean_similarity
                     frequency_results[skill.strip()] = int(frequency)
 
@@ -55,10 +69,13 @@ class SkillMatcher:
         finally:
             self._cleanup_memory()
 
-    def _encode_in_batches(self, texts, batch_size):
+    def _encode_in_batches(self, texts, batch_size, stop_flag=False):
         try:
             all_embeddings = []
             for i in range(0, len(texts), batch_size):
+                if stop_flag:
+                    logging.info("Анализ принудительно остановлен во время кодирования батча.")
+                    return torch.tensor([], device=self.device)
                 batch = texts[i:i + batch_size]
                 if not batch:
                     continue

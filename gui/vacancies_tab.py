@@ -26,16 +26,16 @@ def create_vacancies_tab(frame, app):
     app.vacancies_table.heading("collection_date", text="Дата сбора", command=lambda: sort_treeview_column(app.vacancies_table, "collection_date", False))
     app.vacancies_table.heading("file", text="Файл вакансий", command=lambda: sort_treeview_column(app.vacancies_table, "file", False))
     app.vacancies_table.column("id", width=0, stretch=False)
-    app.vacancies_table.column("name", width=330)
-    app.vacancies_table.column("quantity", width=120)
-    app.vacancies_table.column("collection_date", width=100)
-    app.vacancies_table.column("file", width=250)
+    app.vacancies_table.column("name", width=350)
+    app.vacancies_table.column("quantity", width=90)
+    app.vacancies_table.column("collection_date", width=80)
+    app.vacancies_table.column("file", width=280)
     app.vacancies_table.pack(pady=5, fill="both", expand=False)
 
     add_tooltip_to_treeview(app.vacancies_table)
 
     button_frame = tk.Frame(vacancies_frame)
-    button_frame.pack(side=tk.RIGHT, pady=5, fill="y")
+    button_frame.pack(side=tk.RIGHT, pady=5, padx=5, fill="y")
     tk.Button(button_frame, text="Добавить", command=lambda: edit_vacancy_window(app, None, "add")).pack(pady=5)
     tk.Button(button_frame, text="Редактировать", command=lambda: edit_vacancy_window(app, app.vacancies_table.selection(), "edit")).pack(pady=5)
     tk.Button(button_frame, text="Удалить", command=lambda: delete_vacancy(app)).pack(pady=5)
@@ -62,7 +62,7 @@ def create_vacancies_tab(frame, app):
     app.progress_label.pack_forget()
 
     # Таблица регионов
-    regions_frame = ttk.LabelFrame(vacancies_search_frame, text="Регионы (макс. 3)")
+    regions_frame = ttk.LabelFrame(vacancies_search_frame, text="Регионы (макс. 5)")
     regions_frame.pack(side=tk.RIGHT, fill="both", padx=5, expand=False)
 
     search_region_frame = ttk.Frame(regions_frame)
@@ -99,7 +99,7 @@ def create_vacancies_tab(frame, app):
         var = app.region_vars.get(region_id, tk.BooleanVar(value=False))
         app.region_vars[region_id] = var
         selected_count = sum(1 for v in app.region_vars.values() if v.get())
-        if selected_count <= 3 or var.get():  # Разрешаем снять выбор
+        if selected_count <= 5 or var.get():  # Разрешаем снять выбор
             var.set(not var.get())
             app.regions_table.item(item, values=("☑" if var.get() else "☐", app.regions_table.item(item, "values")[1]))
         else:
