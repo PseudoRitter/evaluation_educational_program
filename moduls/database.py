@@ -16,7 +16,8 @@ class Database:
 
     def connect(self):
         try:
-            self.connection = sqlite3.connect(self.db_path)
+            self.connection = sqlite3.connect(self.db_path, timeout=10)
+            self.connection.execute("PRAGMA journal_mode=WAL;")
             self.cursor = self.connection.cursor()
             logging.info("Успешно подключено к базе данных SQLite")
         except Exception as e:
@@ -34,7 +35,13 @@ class Database:
             logging.error(f"Ошибка при закрытии соединения: {e}")
 
     def get_connection(self):
-        return sqlite3.connect(self.db_path)
+        try:
+            conn = sqlite3.connect(self.db_path, timeout=10)
+            conn.execute("PRAGMA journal_mode=WAL;")
+            return conn
+        except Exception as e:
+            logging.error(f"Ошибка при создании нового соединения: {e}")
+            raise
 
     def release_connection(self, conn):
         if conn:
@@ -201,7 +208,6 @@ class Database:
                     AND university_id = ?;
                 """, (str(name).strip(), str(code).strip(), str(year).strip(), university_id))
                 result = cursor.fetchone()
-                # Возвращаем кортеж даже для одного значения
                 return result if result else None
         except sqlite3.Error as e:
             logging.error(f"Ошибка при получении ID программы: {e}")
@@ -675,10 +681,13 @@ class Database:
             self.release_connection(conn)
 
     def save_assessment_results(self, program_id, vacancy_id, similarity_results):
-        from datetime import datetime  
-        conn = self.get_connection()
+        if not similarity_results:
+            logging.error("Нет данных для сохранения!")
+            return False
+
         try:
             assessment_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+            conn = self.get_connection()
             with conn:
                 cursor = conn.cursor()
                 for competence, (score, type_competence) in similarity_results.items():
@@ -688,18 +697,24 @@ class Database:
                         continue
                     competence_id, _, type_competence_id = competence_data
 
+                    if not self.ensure_competence_program_link(competence_id, type_competence_id, program_id):
+                        logging.error(f"Не удалось создать связь для '{competence}'")
+                        continue
+
                     cursor.execute("""
                         INSERT INTO assessment (
                             competence_id, type_competence_id, educational_program_id, vacancy_id,
                             assessment_date, value
                         ) VALUES (?, ?, ?, ?, ?, ?);
                     """, (competence_id, type_competence_id, program_id, vacancy_id, assessment_date, float(score)))
-                    logging.info(f"Сохранена оценка для '{competence}'")
+                    logging.info(f"Сохранена оценка для '{competence}' со значением {score:.10f}")
                 conn.commit()
+            logging.info("Результаты успешно сохранены в таблице assessment.")
+            return True
         except sqlite3.Error as e:
             conn.rollback()
-            logging.error(f"Ошибка при сохранении результатов оценки: {e}")
-            raise
+            logging.error(f"Ошибка сохранения результатов: {e}", exc_info=True)
+            return False
         finally:
             self.release_connection(conn)
 
@@ -821,44 +836,6 @@ class Database:
         except Exception as e:
             logging.error(f"Ошибка при получении кода программы: {e}")
             return "Неизвестно"
-        finally:
-            self.release_connection(conn)
-
-    def save_assessment_results(self, program_id, vacancy_id, similarity_results):
-        if not similarity_results:
-            logging.error("Нет данных для сохранения!")
-            return False
-
-        try:
-            assessment_date = datetime.now().strftime("%Y-%m-%d %H:%M")
-            conn = self.get_connection()
-            with conn:
-                cursor = conn.cursor()
-                for competence, (score, type_competence) in similarity_results.items():
-                    competence_data = self.fetch_competence_by_name(competence)
-                    if not competence_data:
-                        logging.error(f"Компетенция '{competence}' не найдена!")
-                        continue
-                    competence_id, _, type_competence_id = competence_data
-
-                    if not self.ensure_competence_program_link(competence_id, type_competence_id, program_id):
-                        logging.error(f"Не удалось создать связь для '{competence}'")
-                        continue
-
-                    cursor.execute("""
-                        INSERT INTO assessment (
-                            competence_id, type_competence_id, educational_program_id, vacancy_id,
-                            assessment_date, value
-                        ) VALUES (?, ?, ?, ?, ?, ?);
-                    """, (competence_id, type_competence_id, program_id, vacancy_id, assessment_date, float(score)))
-                    logging.info(f"Сохранена оценка для '{competence}' со значением {score:.6f}")
-                conn.commit()
-            logging.info("Результаты успешно сохранены в таблице assessment.")
-            return True
-        except sqlite3.Error as e:
-            conn.rollback()
-            logging.error(f"Ошибка сохранения результатов: {e}", exc_info=True)
-            return False
         finally:
             self.release_connection(conn)
 

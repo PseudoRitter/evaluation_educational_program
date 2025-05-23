@@ -171,7 +171,6 @@ def get_program_id(app, values):
             return None
         university_id = university[0]
         result = app.logic.db.fetch_program_id_by_name_and_code(name, code, year, university_id)
-        # Если result — кортеж, берем первый элемент; если None — возвращаем None
         return result[0] if result else None
     except Exception as e:
         logging.error(f"Ошибка получения ID программы: {e}")

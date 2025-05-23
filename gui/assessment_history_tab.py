@@ -168,7 +168,7 @@ def update_competence_history_table(app):
         app.competence_history_table.delete(*app.competence_history_table.get_children())
         rows = app.logic.db.fetch_competence_history(educational_program_name, vacancy_name, assessment_date)
         for row in rows:
-            app.competence_history_table.insert("", tk.END, values=(row[0], row[1], f"{row[2]:.6f}"))
+            app.competence_history_table.insert("", tk.END, values=(row[0], row[1], f"{row[2]*4*100:.2f}"))
         update_group_scores(app)
         sort_competence_type_column(app.competence_history_table, "competence_type")
     except Exception as e:
@@ -207,7 +207,7 @@ def update_group_scores(app):
             }
             total_weight = sum(weights.values())
             if not abs(total_weight - 1.0) < 1e-6:
-                app.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight:.2f}")
+                app.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight*4*100:.2f}")
                 return
             for key, val in weights.items():
                 if not (0 <= val <= 1):
@@ -216,12 +216,12 @@ def update_group_scores(app):
             overall_score, weighted_group_scores = app.logic.calculate_overall_score(group_averages, True, weights)
         else:
             overall_score, weighted_group_scores = app.logic.calculate_overall_score(group_averages, False, None)
-            weighted_group_scores = group_averages  # Невзвешенные оценки
+            weighted_group_scores = group_averages  
 
         app.group_scores_history_frame.insert(tk.END, "Оценки групп компетенций:\n")
         for ctype, avg_score in weighted_group_scores.items():
-            app.group_scores_history_frame.insert(tk.END, f"{ctype}: {avg_score:.6f}\n")
-        app.group_scores_history_frame.insert(tk.END, f"\nОбщая оценка программы: {overall_score:.6f}\n")
+            app.group_scores_history_frame.insert(tk.END, f"{ctype}: {avg_score*4*100:.2f}\n")
+        app.group_scores_history_frame.insert(tk.END, f"\nОбщая оценка программы: {overall_score*4*100:.2f}\n")
     except ValueError:
         app.show_error("Введите корректные числовые значения для весов (от 0 до 1)!")
     except Exception as e:
@@ -247,16 +247,16 @@ def delete_assessment_table(app):
         logging.error(f"Ошибка: Неверное количество значений в строке: ожидалось 5, получено {len(values)}: {values}")
         return
 
-    educational_program_name = values[0]  # educational_program
-    vacancy_name = values[3]            # vacancy
-    assessment_date = values[4]         # assessment_date
+    educational_program_name = values[0]  
+    vacancy_name = values[3]            
+    assessment_date = values[4]         
 
     try:
         logging.info(f"Попытка удалить запись: {educational_program_name}, {vacancy_name}, {assessment_date}")
         if app.logic.db.delete_assessment(educational_program_name, vacancy_name, assessment_date):
             app.program_vacancy_history_table.delete(selected_item[0])
             app.group_scores_history_frame.delete(1.0, tk.END)
-            app.refresh_graph_table()  # Обновляем таблицу на вкладке "Графики"
+            app.refresh_graph_table()  
             logging.info(f"Запись '{educational_program_name} - {vacancy_name} - {assessment_date}' удалена из assessment")
             logging.info("Успех: Запись успешно удалена!")
         else:

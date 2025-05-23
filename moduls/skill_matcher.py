@@ -5,11 +5,13 @@ import gc
 import numpy as np
 
 class SkillMatcher:
-    def __init__(self, device="cpu", model_path="C:/python-models/tuned_model_mpnet_v22"):
+    def __init__(self, device="cpu", model_path="C:/python-models/tuned_model_mpnet_v21", boost_factor=0, reduce_factor=0):
         self.device = device
         self.model_path = model_path
         self.model = None
-        logging.info(f"SkillMatcher инициализирован для устройства: {self.device}")
+        self.boost_factor = boost_factor
+        self.reduce_factor = reduce_factor
+        logging.info(f"SkillMatcher инициализирован для устройства: {self.device}, boost_factor: {self.boost_factor}, reduce_factor: {self.reduce_factor}")
 
     def initialize_model(self):
         self._load_model()
@@ -24,7 +26,7 @@ class SkillMatcher:
                 logging.error(f"Ошибка загрузки модели: {e}", exc_info=True)
                 raise
 
-    def match_skills(self, program_skills, job_descriptions, batch_size, threshold=0.5, stop_flag=False):
+    def match_skills(self, program_skills, job_descriptions, batch_size, threshold=0.7, stop_flag=False):
         try:
             if not program_skills or not job_descriptions:
                 logging.warning("Нет данных для анализа навыков.")
@@ -58,6 +60,12 @@ class SkillMatcher:
                     similarities = similarity_matrix[j].cpu().numpy()
                     mean_similarity = similarities.mean().item()
                     frequency = np.sum(similarities >= threshold)
+
+                    # Модификация оценки в зависимости от условий
+                    if mean_similarity < 0.5:
+                        mean_similarity = max(0.0, mean_similarity - self.reduce_factor)  # Уменьшаем оценку, но не ниже 0
+                    elif mean_similarity >= 0.5:
+                        mean_similarity = min(1.0, mean_similarity + self.boost_factor)  # Увеличиваем оценку, но не выше 1
                     similarity_results[skill.strip()] = mean_similarity
                     frequency_results[skill.strip()] = int(frequency)
 

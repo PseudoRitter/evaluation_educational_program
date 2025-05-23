@@ -83,15 +83,12 @@ class Logic:
     def calculate_key_skills_frequency(self, key_skills_list):
         from collections import Counter
         
-        # Считаем общее количество вакансий с ключевыми навыками
         total_vacancies_with_skills = sum(1 for skills in key_skills_list if skills)
         total_vacancies = len(key_skills_list)
         
-        # Собираем все ключевые навыки
         all_key_skills = [skill for sublist in key_skills_list for skill in sublist]
         frequency_counter = Counter(all_key_skills)
         
-        # Формируем список навыков с количеством и процентами
         key_skills_data = []
         for skill, count in frequency_counter.most_common():
             percentage = (count / total_vacancies_with_skills) if total_vacancies > 0 else 0
@@ -99,7 +96,7 @@ class Logic:
         
         return total_vacancies_with_skills, key_skills_data
 
-    def run_analysis(self, program_id, vacancy_id, gui, batch_size, threshold=0.5, use_weights=False, weights=None):
+    def run_analysis(self, program_id, vacancy_id, gui, batch_size, threshold=0.7, use_weights=False, weights=None):
         try:
             vacancy = self.db.fetch_vacancy_details(vacancy_id)
             if not vacancy:

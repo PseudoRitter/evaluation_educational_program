@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Путь к модели
 model_path = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"  # или укажите локальный путь
-#model_path = "C:/python-models/tuned_model_mpnet_v22"
+#model_path = "C:/python-models/tuned_model_mpnet_v21"
 
 # Загрузка модели
 try:
@@ -171,7 +171,13 @@ logger.info(f"R-squared: {r2:.6f}")
 logger.info(f"Mean Bias: {bias:.6f}")
 
 logger.info("\nМетрики, основанные на сходстве и ранжировании:")
-logger.info(f"Среднее косинусное сходство: {np.mean(predicted_similarities):.6f}")
+# logger.info(f"Среднее косинусное сходство: {np.mean(predicted_similarities):.6f}")
+
+# Вычисление среднего косинусного сходства и средней разницы
+mean_similarity = np.mean(predicted_similarities)
+mean_difference = np.mean(np.array(labels) - np.array(predicted_similarities))
+logger.info(f"Среднее косинусное сходство: {mean_similarity:.6f}, Средняя разница (labels - predicted): {mean_difference:.6f}")
+
 logger.info(f"Mean Reciprocal Rank (MRR): {mrr:.6f}")
 logger.info(f"Kendall Tau: {kendall_corr:.6f}")
 logger.info(f"Normalized Discounted Cumulative Gain (NDCG): {ndcg:.6f}")

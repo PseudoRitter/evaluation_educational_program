@@ -20,9 +20,6 @@ def create_assessment_tab(frame, app):
     app.save_results_button = tk.Button(run_frame, text="Сохранить результаты в историю", command=lambda: save_assessment_results(app))
     app.save_results_button.pack(side=tk.LEFT, padx=5)
 
-    app.export_button = tk.Button(run_frame, text="Экспорт в Excel", command=lambda: app.logic.export_results_to_excel(app))
-    app.export_button.pack(side=tk.LEFT, padx=5)
-
     control_frame = tk.Frame(main_frame)
     control_frame.pack(pady=4, fill="x")
 
@@ -33,7 +30,7 @@ def create_assessment_tab(frame, app):
     threshold_label.pack(side="left", padx=5)
 
     app.threshold_entry = ttk.Entry(threshold_frame, width=10)
-    app.threshold_entry.insert(0, "0.5")
+    app.threshold_entry.insert(0, "0.7")
     app.threshold_entry.pack(side="left", padx=5)
 
     app.stop_button.config(state="disabled")
@@ -115,6 +112,9 @@ def create_assessment_tab(frame, app):
     app.skill_results_table.pack(pady=4, fill="x")
     add_tooltip_to_treeview(app.skill_results_table)
 
+    app.export_button = tk.Button(run_frame, text="Экспорт в Excel", command=lambda: app.logic.export_results_to_excel(app))
+    app.export_button.pack(side=tk.LEFT, padx=5)
+
     key_skills_frame = tk.LabelFrame(results_container, text="Наиболее популярные ключевые навыки:")
     key_skills_frame.pack(fill="both", expand=False)
 
@@ -159,8 +159,8 @@ def update_weights(app):
     app.group_scores_area.delete(1.0, tk.END)
     app.group_scores_area.insert(tk.END, "Оценки групп компетенций:\n")
     for ctype, score in (weighted_group_scores if use_weights else results["group_scores"]).items():
-        app.group_scores_area.insert(tk.END, f"{ctype}: {score:.6f}\n")
-    app.group_scores_area.insert(tk.END, f"\nОбщая оценка программы: {overall_score:.6f}\n")
+        app.group_scores_area.insert(tk.END, f"{ctype}: {score*100:.2f}\n")
+    app.group_scores_area.insert(tk.END, f"\nОбщая оценка программы: {overall_score*100:.2f}\n")
 
 def save_assessment_results(app):
     """Сохранение результатов анализа в базу данных."""

@@ -9,6 +9,8 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 class TextPreprocessor:
     def __init__(self, model_path="C:/python-models/tuned_model_deeppavlov_v1"):
+    #def __init__(self, model_path="python-models/tuned_model_deeppavlov_v1"):
+
         self.model_path = os.path.normpath(model_path)
         if not os.path.exists(self.model_path):
             raise FileNotFoundError(f"Директория {self.model_path} не существует.")

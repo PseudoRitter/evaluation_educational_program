@@ -7,8 +7,8 @@ class ExcelExporter:
         self.results = results
         self.program_name = program_name
         self.vacancy_name = vacancy_name
-        self.university = university  # Добавляем ВУЗ
-        self.year = year  # Добавляем год
+        self.university = university  
+        self.year = year  
 
     def export_to_excel(self):
         if not self.results:

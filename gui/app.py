@@ -24,7 +24,7 @@ class App:
         self.selected_vacancy_id = None
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.stop_analysis_flag = False
-        self.current_future = None  # Для отслеживания текущей задачи
+        self.current_future = None  
         self.create_widgets()
         self.load_initial_data()
 
@@ -89,8 +89,8 @@ class App:
         def set_status():
             if hasattr(self, 'status_label'):
                 self.status_label.config(text=status_text)
-            self.root.update_idletasks()  # Обновляем GUI немедленно
-        self.root.after(0, set_status)  # Выполняем в главном потоке
+            self.root.update_idletasks()  
+        self.root.after(0, set_status) 
 
     def start_analysis(self):
         """Запуск анализа соответствия программы и вакансии с учетом весов."""
@@ -100,7 +100,7 @@ class App:
 
         try:
             threshold_str = self.threshold_entry.get()
-            threshold = float(threshold_str) if threshold_str.strip() else 0.5
+            threshold = float(threshold_str) if threshold_str.strip() else 0.7
             if not (0 <= threshold <= 1):
                 self.show_error("Пороговое значение должно быть от 0 до 1!")
                 return
@@ -122,13 +122,12 @@ class App:
                         self.show_error(f"Вес для {key} должен быть от 0 до 1!")
                         return
 
-            self.stop_analysis_flag = False  # Сбрасываем флаг перед началом
-            self.run_button.config(state="disabled")  # Отключаем кнопку запуска
-            self.stop_button.config(state="normal")   # Включаем кнопку остановки
+            self.stop_analysis_flag = False 
+            self.run_button.config(state="disabled") 
+            self.stop_button.config(state="normal")  
             logging.debug(f"Запуск анализа с порогом: {threshold}, использование весов: {use_weights}, веса: {weights}")
             self.show_info("Запуск анализа...")
-            self.update_status("Классификация предложений")  # Начало анализа
-            # Сохраняем future для возможности отслеживания
+            self.update_status("Классификация предложений")  
             self.current_future = self.executor.submit(self.logic.run_analysis, self.program_id, self.selected_vacancy_id, self, self.batch_size, threshold, use_weights, weights)
             self.current_future.add_done_callback(self.on_analysis_complete)
         except ValueError:
@@ -152,19 +151,15 @@ class App:
             logging.info("Очистка ресурсов GPU при принудительной остановке...")
             import gc
             import torch
-            # Проверяем наличие matcher и его модели
             if hasattr(self.logic, 'matcher') and self.logic.matcher is not None and hasattr(self.logic.matcher, 'model') and self.logic.matcher.model is not None:
-                self.logic.matcher.model.to("cpu")  # Перемещаем модель на CPU
-                self.logic.matcher.model = None  # Очищаем модель
+                self.logic.matcher.model.to("cpu")  
+                self.logic.matcher.model = None 
                 logging.info("Модель matcher перемещена на CPU и очищена")
-            # Очистка кэша GPU
             gc.collect()
             torch.cuda.empty_cache()
             logging.info("Ресурсы GPU очищены")
 
-        # Попытка завершить текущую задачу
         if hasattr(self, 'current_future'):
-            # Нельзя напрямую отменить задачу, но устанавливаем флаг и очищаем ресурсы
             logging.info("Задача анализа помечена для остановки")
 
     def on_analysis_complete(self, future):
@@ -177,18 +172,18 @@ class App:
             results = future.result()
             if not results or "similarity_results" not in results:
                 self.show_error("Анализ не выполнен: данные недоступны")
-                self.update_status("Не запущен")  # Сброс статуса при ошибке
+                self.update_status("Не запущен")  
                 return
             self.update_results(results)
-            self.update_status("Анализ завершен")  # Успешное завершение
+            self.update_status("Анализ завершен")  
         except Exception as e:
             logging.error(f"Ошибка анализа: {e}", exc_info=True)
             self.show_error(f"Ошибка: {e}")
-            self.update_status("Не запущен")  # Сброс статуса при ошибке
+            self.update_status("Не запущен")  
             self.run_button.config(state="normal")
             self.stop_button.config(state="disabled")
         finally:
-            self.current_future = None  # Очищаем ссылку на задачу
+            self.current_future = None  
 
     def show_error(self, message):
         logging.error(f"GUI Error: {message}")
@@ -205,7 +200,7 @@ class App:
             app.key_skills_area.delete(1.0, tk.END)
 
             for skill, (score, ctype) in results["similarity_results"].items():
-                app.skill_results_table.insert("", tk.END, values=(skill, ctype, f"{score:.6f}"))
+                app.skill_results_table.insert("", tk.END, values=(skill, ctype, f"{score*100:.2f}"))
 
             total_vacancies_with_skills = results.get("total_vacancies_with_skills", 0)
             app.key_skills_area.insert(tk.END, f"Число вакансий с ключевыми навыками: {total_vacancies_with_skills}\n")
@@ -233,8 +228,8 @@ class App:
 
             app.group_scores_area.insert(tk.END, "Оценки групп компетенций:\n")
             for ctype, score in (weighted_group_scores if use_weights else results["group_scores"]).items():
-                app.group_scores_area.insert(tk.END, f"{ctype}: {score:.6f}\n")
-            app.group_scores_area.insert(tk.END, f"\nОбщая оценка программы: {overall_score:.6f}\n")
+                app.group_scores_area.insert(tk.END, f"{ctype}: {score*100:.2f}\n")
+            app.group_scores_area.insert(tk.END, f"\nОбщая оценка программы: {overall_score*100:.2f}\n")
         except ValueError:
             app.show_error("Введите корректные числовые значения для весов (от 0 до 1)!")
         except Exception as e:

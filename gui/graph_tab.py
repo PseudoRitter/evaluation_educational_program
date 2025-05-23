@@ -37,7 +37,7 @@ def create_comparison_op_vacancies_tab(frame, app):
     program_frame.pack(fill="both", expand=True, padx=10, pady=5)
     
     columns = ("program_name", "program_code", "university", "year")
-    app.graph_program_table = ttk.Treeview(program_frame, columns=columns, show="headings", height=5)
+    app.graph_program_table = ttk.Treeview(program_frame, columns=columns, show="headings", height=9)
     app.graph_program_table.pack(fill="both", expand=True, padx=5, pady=5)
     
     app.graph_program_table.heading("program_name", text="Название ОП", command=lambda: sort_treeview_column(app.graph_program_table, "program_name"))
@@ -156,7 +156,7 @@ def display_graph_op_vacancies(app):
         
         for bar, score in zip(bars, scores):
             height = bar.get_height()
-            ax.text(bar.get_x() + BAR_WIDTH / 2, height, f"{height:.4f}", ha="center", va="bottom", fontsize=8)
+            ax.text(bar.get_x() + BAR_WIDTH / 2, height, f"{height*4*100:.2f}", ha="center", va="bottom", fontsize=8)
     
     ax.set_ylim(y_min, y_max)
     ax.set_xticks(offsets[n_bars // 2::n_bars])
@@ -182,7 +182,7 @@ def create_comparison_vacancies_op_tab(frame, app):
     vacancy_frame.pack(fill="both", expand=True, padx=10, pady=5)
     
     columns = ("vacancy_name",)
-    app.graph_vacancy_table = ttk.Treeview(vacancy_frame, columns=columns, show="headings", height=5)
+    app.graph_vacancy_table = ttk.Treeview(vacancy_frame, columns=columns, show="headings", height=13)
     app.graph_vacancy_table.pack(fill="both", expand=True, padx=5, pady=5)
     app.graph_vacancy_table.heading("vacancy_name", text="Название вакансии", command=lambda: sort_treeview_column(app.graph_vacancy_table, "vacancy_name"))
     app.graph_vacancy_table.column("vacancy_name", width=450)
@@ -306,7 +306,7 @@ def display_graph_vacancies_op(app):
         
         for bar, score in zip(bars, scores):
             height = bar.get_height()
-            ax.text(bar.get_x() + BAR_WIDTH / 2, height, f"{height:.4f}", ha="center", va="bottom", fontsize=8)
+            ax.text(bar.get_x() + BAR_WIDTH / 2, height, f"{height*4*100:.2f}", ha="center", va="bottom", fontsize=8)
     
     ax.set_ylim(y_min, y_max)
     ax.set_xticks(offsets[n_bars // 2::n_bars])
@@ -338,7 +338,7 @@ def create_frequency_tab(frame, app):
     competence_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
     columns = ("competence", "competence_type", "number")
-    app.competence_frequency_table = ttk.Treeview(competence_frame, columns=columns, show="headings", height=5)
+    app.competence_frequency_table = ttk.Treeview(competence_frame, columns=columns, show="headings", height=12)
     app.competence_frequency_table.pack(fill="both", expand=True, padx=5, pady=5)
     app.competence_frequency_table.heading("competence", text="Компетенция")
     app.competence_frequency_table.heading("competence_type", text="Вид компетенции", command=lambda: sort_competence_type_column(app.competence_frequency_table, "competence_type"))
@@ -462,7 +462,7 @@ def plot_frequency_histogram(window, competences, frequencies):
     bars = ax.barh(numbers, freq_values, color=colors)
     ax.set_xlabel("Частота упоминания")
     ax.set_ylabel("Порядковый номер компетенции")
-    ax.set_title("Частота упоминания компетенций в вакансиях (сходство > 0.5)")
+    ax.set_title("Частота упоминания компетенций в вакансиях (сходство > 0.7)")
     ax.invert_yaxis()
 
     # Устанавливаем пределы оси X: от 0 до N + 10, где N — максимальная частота

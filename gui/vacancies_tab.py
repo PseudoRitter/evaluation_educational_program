@@ -61,7 +61,6 @@ def create_vacancies_tab(frame, app):
     app.progress_label.pack(pady=5)
     app.progress_label.pack_forget()
 
-    # Таблица регионов
     regions_frame = ttk.LabelFrame(vacancies_search_frame, text="Регионы (макс. 5)")
     regions_frame.pack(side=tk.RIGHT, fill="both", padx=5, expand=False)
 
@@ -75,31 +74,27 @@ def create_vacancies_tab(frame, app):
     app.regions_table.heading("select", text="Выбрать")
     app.regions_table.heading("name", text="Название региона", command=lambda: sort_treeview_column(app.regions_table, "name", False))
     app.regions_table.column("select", width=60, anchor="center")
-    app.regions_table.column("name", width=280)  # Увеличил ширину, чтобы компенсировать удаление ID
+    app.regions_table.column("name", width=280)  
     app.regions_table.pack(pady=5, fill="both", expand=True)
 
-    # Привязка прокрутки колесом мыши
     def on_mouse_wheel(event):
         app.regions_table.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
-    app.regions_table.bind("<MouseWheel>", on_mouse_wheel)  # Для Windows
+    app.regions_table.bind("<MouseWheel>", on_mouse_wheel)  
 
-    # Загружаем регионы
     ACCESS_TOKEN = "APPLRDK45780T0N5LTCCGEC9DU19NPGSORRJP5535R95VETEF4203PHSQI97V49C"
     hh_data = LaborMarketData(query="test", access_token=ACCESS_TOKEN)
     regions = hh_data.fetch_areas()
-    app.region_vars = {}  # Словарь для хранения состояния регионов
-
+    app.region_vars = {}  
     def toggle_region(event):
         item = app.regions_table.identify_row(event.y)
         if not item:
             return
-        # Используем тег для хранения region_id
         region_id = app.regions_table.item(item, "tags")[0]
         var = app.region_vars.get(region_id, tk.BooleanVar(value=False))
         app.region_vars[region_id] = var
         selected_count = sum(1 for v in app.region_vars.values() if v.get())
-        if selected_count <= 5 or var.get():  # Разрешаем снять выбор
+        if selected_count <= 5 or var.get(): 
             var.set(not var.get())
             app.regions_table.item(item, values=("☑" if var.get() else "☐", app.regions_table.item(item, "values")[1]))
         else:
@@ -114,13 +109,10 @@ def create_vacancies_tab(frame, app):
                 app.region_vars[region_id] = var
                 app.regions_table.insert("", tk.END, values=("☑" if var.get() else "☐", region_name), tags=(region_id,))
 
-    # Привязка клика для переключения состояния
     app.regions_table.bind("<Button-1>", toggle_region)
 
-    # Изначальное заполнение таблицы
     filter_regions()
 
-    # Привязка поиска к событию изменения текста
     app.region_search_entry.bind("<KeyRelease>", filter_regions)
 
     load_vacancies_table(app)

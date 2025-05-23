@@ -35,7 +35,6 @@ def load_tables(app):
     programs_data = [(p[0], p[1], p[2] or "", p[3], p[4]) for p in app.programs]
     load_table(app.program_table, programs_data)
 
-    # Восстанавливаем выбор программы по четырем полям
     if getattr(app, "last_selected_program_data", None) and len(app.last_selected_program_data) == 4:
         logging.debug(f"Попытка восстановить выбор: {app.last_selected_program_data}")
         name, code, year, university_short = app.last_selected_program_data
@@ -47,7 +46,7 @@ def load_tables(app):
                 values[2] == year and values[3] == university_short):
                 app.program_table.selection_set(item)
                 app.program_table.focus(item)
-                on_program_table_select(app)  # Обновляем компетенции
+                on_program_table_select(app)  
                 logging.debug(f"Выбор восстановлен на: {values}")
                 found = True
                 break
@@ -244,9 +243,8 @@ def edit_entity_window(app, parent_window, entity_type, action):
     selected_program = app.program_table.selection()
     if selected_program:
         values = app.program_table.item(selected_program[0])["values"]
-        app.last_selected_program_data = (values[0], values[1], values[2], values[3])  # Используем все 4 поля
+        app.last_selected_program_data = (values[0], values[1], values[2], values[3])  
         logging.debug(f"Обновлено last_selected_program_data в edit_entity_window: {app.last_selected_program_data}")
-    # else: не сбрасываем last_selected_program_data, оставляем как есть
 
     window = tk.Toplevel(parent_window)
     window.title(f"{action.capitalize()} {config['title']}")
@@ -301,14 +299,12 @@ def save_entity(app, window, parent_window, entity_type, action, entries, old_va
         
         window.destroy()
         
-        # После сохранения обновляем таблицы и восстанавливаем выбор программы
         if entity_type == "program":
             from .education_tab import sync_program_tables
             sync_program_tables(app)
         else:
             load_tables(app)
             
-        # Если добавляли компетенцию, восстанавливаем выбор программы
         if (entity_type == "competence" and 
             hasattr(app, "selected_program_id") and 
             getattr(app, "last_selected_program_data", None) is not None and 
@@ -331,7 +327,6 @@ def save_entity(app, window, parent_window, entity_type, action, entries, old_va
                 logging.warning(f"Программа не найдена в базе для восстановления: {app.last_selected_program_data}")
     except Exception as e:
         logging.error(f"Ошибка сохранения {entity_type}: {e}")
-        # Не закрываем окно, чтобы пользователь мог исправить ошибку
 
 def save_university(app, values, old_values, action):
     """Сохранение данных университета."""
@@ -342,7 +337,6 @@ def save_university(app, values, old_values, action):
             app.universities = app.logic.db.fetch_universities()
             logging.info(f"ВУЗ '{full_name}' добавлен!")
     else:
-        # Убираем лишнее индексирование [0], так как fetch_university_id_by_details возвращает int или None
         university_id = app.logic.db.fetch_university_id_by_details(*old_values)
         if university_id and app.logic.db.update_university(university_id, full_name, short_name, city):
             app.universities = app.logic.db.fetch_universities()
@@ -359,8 +353,8 @@ def save_program(app, values, old_values, action):
         logging.error("ВУЗ или тип программы не найден!")
         return
 
-    university_id = university[0]  # Кортеж, берем первый элемент
-    type_program_id = type_program  # Уже int или None, индексация не нужна
+    university_id = university[0]  
+    type_program_id = type_program  
     if action == "добавить":
         program_id = app.logic.db.save_educational_program(name, code, university_id, year, type_program_id, [])
         if program_id:
@@ -392,7 +386,7 @@ def save_competence(app, values, old_values, action):
         return
 
     conn = app.logic.db.get_connection()
-    cursor = conn.cursor()  # Создаем курсор вручную
+    cursor = conn.cursor()  
     try:
         if action == "добавить":
             competence = app.logic.db.fetch_competence_by_name(competence_name)
@@ -429,7 +423,7 @@ def save_competence(app, values, old_values, action):
         logging.error(f"Ошибка при сохранении компетенции: {e}")
         raise
     finally:
-        cursor.close()  # Закрываем курсор вручную
+        cursor.close()  
         app.logic.db.release_connection(conn)
         
 def delete_entity(app, parent_window, entity_type):
@@ -444,7 +438,6 @@ def delete_entity(app, parent_window, entity_type):
     values = table.item(selected_item[0])["values"]
     try:
         if entity_type == "university":
-            # Убираем [0], так как fetch_university_id_by_details возвращает int или None
             university_id = app.logic.db.fetch_university_id_by_details(*values)
             if university_id and app.logic.db.delete_university(university_id):
                 app.universities = app.logic.db.fetch_universities()

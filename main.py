@@ -47,7 +47,6 @@ def on_closing(root, app, logic):
     """Обработчик закрытия окна с подтверждением и полным завершением процессов."""
     if messagebox.askyesno("Подтверждение", "Уверены, что хотите закрыть программу?"):
         try:
-            # Завершаем ThreadPoolExecutor в App
             if hasattr(app, 'executor'):
                 app.executor.shutdown(wait=False)
                 logging.info("Executor в App завершен")
@@ -56,39 +55,32 @@ def on_closing(root, app, logic):
                 app.vac_executor.shutdown(wait=False)
                 logging.info("Vac_executor в App завершен")
 
-            # Завершаем ThreadPoolExecutor в Logic
             if hasattr(logic, 'executor'):
                 logic.executor.shutdown(wait=False)
                 logging.info("Executor в Logic завершен")
 
-            # Очищаем ресурсы GPU, если используются
             if hasattr(logic, 'device') and logic.device == "cuda":
-                # Проверяем наличие matcher и его модели
                 if hasattr(logic, 'matcher') and logic.matcher is not None and hasattr(logic.matcher, 'model') and logic.matcher.model is not None:
-                    logic.matcher.model.to("cpu")  # Перемещаем модель на CPU
-                    del logic.matcher.model  # Удаляем модель
+                    logic.matcher.model.to("cpu")  
+                    del logic.matcher.model  
                     logging.info("Модель matcher перемещена на CPU и удалена")
-                # Очистка кэша GPU из run_analysis
                 logging.info("Очистка кэш GPU при закрытии программы...")
                 gc.collect()
                 torch.cuda.empty_cache()
                 logging.info("Ресурсы GPU очищены")
 
-            # Закрываем соединение с базой данных
             if hasattr(logic.db, 'close_connection'):
                 logic.db.close_connection()
                 logging.info("Соединение с базой данных закрыто")
 
-            # Уничтожаем главное окно
             root.destroy()
             logging.info("Программа закрыта пользователем")
 
-            # Принудительное завершение процесса Python
-            os._exit(0)  # Используем os._exit для немедленного завершения
+            os._exit(0)  
 
         except Exception as e:
             logging.error(f"Ошибка при закрытии программы: {e}", exc_info=True)
-            os._exit(1)  # Принудительное завершение с ошибкой
+            os._exit(1)  
 
 def main():
     """Запуск приложения."""
@@ -100,10 +92,8 @@ def main():
     logic = Logic(batch_size=BATCH_SIZE)
     app = App(root, logic, batch_size=BATCH_SIZE)
     
-    # Настройка глобальных сочетаний клавиш
     setup_global_keybindings(root)
     
-    # Перехват события закрытия окна
     root.protocol("WM_DELETE_WINDOW", lambda: on_closing(root, app, logic))
     
     try:

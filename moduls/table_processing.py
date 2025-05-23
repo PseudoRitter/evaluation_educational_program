@@ -1,12 +1,11 @@
 import tkinter as tk
 import tkinter.ttk as ttk
 
-# Класс для всплывающей подсказки с задержкой
 class ToolTip:
     def __init__(self, widget):
         self.widget = widget
         self.tip_window = None
-        self.after_id = None  # Для хранения идентификатора отложенного вызова
+        self.after_id = None  
 
     def wrap_text(self, text, max_width=80):
         """Разбивает текст на строки, каждая из которых не превышает max_width символов."""
@@ -15,7 +14,6 @@ class ToolTip:
         current_line = []
 
         for word in words:
-            # Проверяем, помещается ли слово в текущую строку
             if sum(len(w) for w in current_line) + len(word) + len(current_line) <= max_width:
                 current_line.append(word)
             else:
@@ -31,14 +29,12 @@ class ToolTip:
         if self.tip_window or not text:
             return
 
-        # Разбиваем текст на строки с учетом ограничения по длине
         wrapped_text = self.wrap_text(text, max_width=100)
 
-        x, y = self.widget.winfo_pointerxy()  # Получаем координаты курсора
+        x, y = self.widget.winfo_pointerxy()  
         self.tip_window = tw = tk.Toplevel(self.widget)
-        tw.wm_overrideredirect(True)  # Убираем рамку окна
-        tw.wm_geometry(f"+{x + 10}+{y + 10}")  # Позиционируем рядом с курсором
-
+        tw.wm_overrideredirect(True)  
+        tw.wm_geometry(f"+{x + 10}+{y + 10}")  
         label = tk.Label(
             tw,
             text=wrapped_text,
@@ -54,7 +50,7 @@ class ToolTip:
     def hide_tip(self):
         """Скрыть всплывающую подсказку."""
         if self.after_id:
-            self.widget.after_cancel(self.after_id)  # Отменяем отложенный вызов
+            self.widget.after_cancel(self.after_id)  
             self.after_id = None
         tw = self.tip_window
         self.tip_window = None
@@ -64,8 +60,8 @@ class ToolTip:
     def schedule_tip(self, text):
         """Запланировать показ подсказки с задержкой."""
         if self.after_id:
-            self.widget.after_cancel(self.after_id)  # Отменяем предыдущий вызов
-        self.after_id = self.widget.after(800, lambda: self.show_tip(text))  # Задержка 0.8 секунды
+            self.widget.after_cancel(self.after_id)  
+        self.after_id = self.widget.after(800, lambda: self.show_tip(text)) 
 
 
 def sort_treeview_column(treeview, col, reverse=False):
@@ -121,19 +117,17 @@ def add_tooltip_to_treeview(treeview):
 
     def on_motion(event):
         """Обработчик события движения курсора над таблицей."""
-        item = treeview.identify_row(event.y)  # Определяем строку
-        column = treeview.identify_column(event.x)  # Определяем столбец
+        item = treeview.identify_row(event.y)  
+        column = treeview.identify_column(event.x)  
         if item and column:
-            # Получаем индекс столбца (column возвращает строку вида "#0", "#1" и т.д.)
-            col_index = int(column[1:]) - 1  # Преобразуем в индекс (нумерация начинается с #0, но нам нужен 0-based index)
-            if col_index >= 0:  # Проверяем, что это не столбец заголовка дерева (#0)
+            col_index = int(column[1:]) - 1 
+            if col_index >= 0:  
                 values = treeview.item(item, 'values')
                 if values and len(values) > col_index:
-                    full_text = values[col_index]  # Текст из конкретной ячейки
-                    tooltip.schedule_tip(full_text)  # Запускаем отложенный показ
+                    full_text = values[col_index]  
+                    tooltip.schedule_tip(full_text)  
         else:
-            tooltip.hide_tip()  # Скрываем, если курсор не над ячейкой
+            tooltip.hide_tip()  
 
-    # Привязываем события к таблице
     treeview.bind('<Motion>', on_motion)
     treeview.bind('<Leave>', lambda e: tooltip.hide_tip())

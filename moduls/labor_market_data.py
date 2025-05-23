@@ -21,7 +21,6 @@ class LaborMarketData:
             response = requests.get(url, headers=self.headers, timeout=30)
             if response.status_code == 200:
                 areas = response.json()
-                # Фильтруем только регионы России (id 113) и их подрегионы
                 russia = next((area for area in areas if area["id"] == "113"), None)
                 if russia:
                     regions = russia["areas"]
@@ -43,7 +42,7 @@ class LaborMarketData:
             "experience": experience
         }
         if area_ids:
-            params["area"] = area_ids  # Может быть списком или одним ID
+            params["area"] = area_ids 
         try:
             response = requests.get(self.base_url, params=params, headers=self.headers, timeout=30)
             if response.status_code == 200:
