@@ -96,7 +96,7 @@ class Logic:
         
         return total_vacancies_with_skills, key_skills_data
 
-    def run_analysis(self, program_id, vacancy_id, gui, batch_size, threshold=0.7, use_weights=False, weights=None):
+    def run_analysis(self, program_id, vacancy_id, gui, batch_size, threshold=75, use_weights=False, weights=None):
         try:
             vacancy = self.db.fetch_vacancy_details(vacancy_id)
             if not vacancy:
@@ -104,6 +104,7 @@ class Logic:
                 logging.error("Вакансия не найдена в базе данных.")
                 return {}
             self.vacancy_file = vacancy[3]
+            vacancy_name = vacancy[0]
 
             full_path = os.path.join(self.db.data_dir, self.vacancy_file)
             if not os.path.exists(full_path):
@@ -125,6 +126,22 @@ class Logic:
                 logging.error("Образовательная программа не найдена в базе данных.")
                 return {}
             
+            # Сравнение названий программы и вакансии
+            name_similarity = self.matcher.compare_program_vacancy_names(title, vacancy_name)
+            logging.info(f"Сходство названий программы и вакансии: {name_similarity:.4f}")
+
+            # Полная очистка памяти после сравнения названий
+            if self.device == "cuda":
+                logging.info("Полная очистка кэша GPU после сравнения названий...")
+                if hasattr(self.matcher, "paraphrase_model") and self.matcher.paraphrase_model is not None:
+                    self.matcher.paraphrase_model.to("cpu")
+                    del self.matcher.paraphrase_model
+                    self.matcher.paraphrase_model = None
+                    logging.info("Модель paraphrase-multilingual-mpnet-base-v2 удалена")
+                gc.collect()
+                torch.cuda.empty_cache()
+                logging.info("Кэш GPU полностью очищен")
+
             skills = [skill for skill, _ in skills_with_types]
             competence_types = [ctype for _, ctype in skills_with_types]
 
@@ -164,7 +181,6 @@ class Logic:
                 return {}
             
             logging.debug(f"Классифицировано предложений: {len(classified_results)}")
-            gui.update_classification_table(classified_results)
             filtered_texts = "\n".join(filtered_sentences)
 
             if device == "cuda":
@@ -178,7 +194,10 @@ class Logic:
 
             gui.show_info("Шаг 2: Оценка соответствия компетенций...")
             gui.update_status("Оценка соответствия предложений")
-            results = self.matcher.match_skills(skills, filtered_texts.split("\n"), batch_size, threshold, stop_flag=gui.stop_analysis_flag)
+            results = self.matcher.match_skills(
+                skills, filtered_texts.split("\n"), batch_size, threshold, 
+                stop_flag=gui.stop_analysis_flag, competence_types=competence_types
+            )
             if gui.stop_analysis_flag:
                 logging.info("Анализ принудительно остановлен во время оценки компетенций.")
                 return {}

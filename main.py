@@ -9,11 +9,10 @@ from gui.app import App
 from logic import Logic
 from concurrent.futures import ThreadPoolExecutor
 
-
 def configure_logging():
     """Настройка логирования."""
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,  # Изменено на INFO для уменьшения логов
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
 
@@ -86,7 +85,7 @@ def main():
     """Запуск приложения."""
     configure_logging()
 
-    BATCH_SIZE = 32
+    BATCH_SIZE = 64
 
     root = tk.Tk()
     logic = Logic(batch_size=BATCH_SIZE)

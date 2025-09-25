@@ -70,7 +70,7 @@ def create_rating_history_tab(frame, app):
     app.program_vacancy_history_table.heading("year", text="Год", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "year", False))
     app.program_vacancy_history_table.heading("vacancy", text="Вакансия", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "vacancy", False))
     app.program_vacancy_history_table.heading("assessment_date", text="Дата и время анализа", command=lambda: sort_treeview_column(app.program_vacancy_history_table, "assessment_date", False))
-    app.program_vacancy_history_table.column("educational_program", width=300)
+    app.program_vacancy_history_table.column("educational_program", width=100)
     app.program_vacancy_history_table.column("university", width=80)
     app.program_vacancy_history_table.column("year", width=80)
     app.program_vacancy_history_table.column("vacancy", width=250)
@@ -168,7 +168,7 @@ def update_competence_history_table(app):
         app.competence_history_table.delete(*app.competence_history_table.get_children())
         rows = app.logic.db.fetch_competence_history(educational_program_name, vacancy_name, assessment_date)
         for row in rows:
-            app.competence_history_table.insert("", tk.END, values=(row[0], row[1], f"{row[2]*4*100:.2f}"))
+            app.competence_history_table.insert("", tk.END, values=(row[0], row[1], f"{row[2]:.0f}"))
         update_group_scores(app)
         sort_competence_type_column(app.competence_history_table, "competence_type")
     except Exception as e:
@@ -207,7 +207,7 @@ def update_group_scores(app):
             }
             total_weight = sum(weights.values())
             if not abs(total_weight - 1.0) < 1e-6:
-                app.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight*4*100:.2f}")
+                app.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight:.0f}")
                 return
             for key, val in weights.items():
                 if not (0 <= val <= 1):
@@ -220,8 +220,8 @@ def update_group_scores(app):
 
         app.group_scores_history_frame.insert(tk.END, "Оценки групп компетенций:\n")
         for ctype, avg_score in weighted_group_scores.items():
-            app.group_scores_history_frame.insert(tk.END, f"{ctype}: {avg_score*4*100:.2f}\n")
-        app.group_scores_history_frame.insert(tk.END, f"\nОбщая оценка программы: {overall_score*4*100:.2f}\n")
+            app.group_scores_history_frame.insert(tk.END, f"{ctype}: {min(avg_score,100):.0f}\n")
+        app.group_scores_history_frame.insert(tk.END, f"\nОбщая оценка программы: {min(overall_score,100):.0f}\n")
     except ValueError:
         app.show_error("Введите корректные числовые значения для весов (от 0 до 1)!")
     except Exception as e:

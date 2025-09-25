@@ -30,7 +30,7 @@ def create_assessment_tab(frame, app):
     threshold_label.pack(side="left", padx=5)
 
     app.threshold_entry = ttk.Entry(threshold_frame, width=10)
-    app.threshold_entry.insert(0, "0.7")
+    app.threshold_entry.insert(0, "75")
     app.threshold_entry.pack(side="left", padx=5)
 
     app.stop_button.config(state="disabled")
@@ -40,7 +40,7 @@ def create_assessment_tab(frame, app):
             return True
         try:
             val = float(value)
-            return 0 <= val <= 1
+            return 0 <= val <= 100
         except ValueError:
             return False
 
@@ -144,7 +144,7 @@ def update_weights(app):
             }
             total_weight = sum(weights.values())
             if not abs(total_weight - 1.0) < 1e-6:
-                app.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight:.2f}")
+                app.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight:.0f}")
                 return
             for key, val in weights.items():
                 if not (0 <= val <= 1):
@@ -159,8 +159,8 @@ def update_weights(app):
     app.group_scores_area.delete(1.0, tk.END)
     app.group_scores_area.insert(tk.END, "Оценки групп компетенций:\n")
     for ctype, score in (weighted_group_scores if use_weights else results["group_scores"]).items():
-        app.group_scores_area.insert(tk.END, f"{ctype}: {score*100:.2f}\n")
-    app.group_scores_area.insert(tk.END, f"\nОбщая оценка программы: {overall_score*100:.2f}\n")
+        app.group_scores_area.insert(tk.END, f"{ctype}: {min(score, 100):.0f}\n")
+    app.group_scores_area.insert(tk.END, f"\nОбщая оценка программы: {min(overall_score, 100):.0f}\n")
 
 def save_assessment_results(app):
     """Сохранение результатов анализа в базу данных."""

@@ -100,9 +100,9 @@ class App:
 
         try:
             threshold_str = self.threshold_entry.get()
-            threshold = float(threshold_str) if threshold_str.strip() else 0.7
-            if not (0 <= threshold <= 1):
-                self.show_error("Пороговое значение должно быть от 0 до 1!")
+            threshold = float(threshold_str) if threshold_str.strip() else 75
+            if not (0 <= threshold <= 100):
+                self.show_error("Пороговое значение должно быть от 0 до 100!")
                 return
 
             use_weights = self.use_weights_var.get()
@@ -115,7 +115,7 @@ class App:
                 }
                 total_weight = sum(weights.values())
                 if not abs(total_weight - 1.0) < 1e-6:
-                    self.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight:.2f}")
+                    self.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight:.0f}")
                     return
                 for key, val in weights.items():
                     if not (0 <= val <= 1):
@@ -200,12 +200,12 @@ class App:
             app.key_skills_area.delete(1.0, tk.END)
 
             for skill, (score, ctype) in results["similarity_results"].items():
-                app.skill_results_table.insert("", tk.END, values=(skill, ctype, f"{score*100:.2f}"))
+                app.skill_results_table.insert("", tk.END, values=(skill, ctype, f"{min(score, 100):.0f}"))
 
             total_vacancies_with_skills = results.get("total_vacancies_with_skills", 0)
             app.key_skills_area.insert(tk.END, f"Число вакансий с ключевыми навыками: {total_vacancies_with_skills}\n")
             for skill, count, percentage in results.get("key_skills_data", []):
-                app.key_skills_area.insert(tk.END, f"{skill} ({count}/{percentage:.2f})\n")
+                app.key_skills_area.insert(tk.END, f"{skill} ({count}/{percentage:.0f})\n")
 
             use_weights = app.use_weights_var.get()
             weights = None
@@ -217,7 +217,7 @@ class App:
                 }
                 total_weight = sum(weights.values())
                 if not abs(total_weight - 1.0) < 1e-6:
-                    app.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight:.2f}")
+                    app.show_error(f"Сумма весов должна равняться 1, текущая сумма: {total_weight:.0f}")
                     return
                 for key, val in weights.items():
                     if not (0 <= val <= 1):
@@ -228,20 +228,20 @@ class App:
 
             app.group_scores_area.insert(tk.END, "Оценки групп компетенций:\n")
             for ctype, score in (weighted_group_scores if use_weights else results["group_scores"]).items():
-                app.group_scores_area.insert(tk.END, f"{ctype}: {score*100:.2f}\n")
-            app.group_scores_area.insert(tk.END, f"\nОбщая оценка программы: {overall_score*100:.2f}\n")
+                app.group_scores_area.insert(tk.END, f"{ctype}: {min(score, 100):.0f}\n")
+            app.group_scores_area.insert(tk.END, f"\nОбщая оценка программы: {min(overall_score,100):.0f}\n")
         except ValueError:
             app.show_error("Введите корректные числовые значения для весов (от 0 до 1)!")
         except Exception as e:
             logging.error(f"Ошибка обновления результатов: {e}", exc_info=True)
             app.show_error(f"Ошибка обновления: {e}")
 
-    def update_classification_table(self, classified_sentences):
-        try:
-            self.classification_table.delete(*self.classification_table.get_children())
-            category_mapping = {0: "Требования", 1: "О компании/условия"}
-            for sentence, label in classified_sentences:
-                self.classification_table.insert("", tk.END, values=(sentence, category_mapping.get(label, "Неизвестно")))
-        except Exception as e:
-            logging.error(f"Ошибка обновления классификации: {e}", exc_info=True)
-            self.show_error(f"Ошибка классификации: {e}")
+    # def update_classification_table(self, classified_sentences):
+    #     try:
+    #         self.classification_table.delete(*self.classification_table.get_children())
+    #         category_mapping = {0: "Требования", 1: "О компании/условия"}
+    #         for sentence, label in classified_sentences:
+    #             self.classification_table.insert("", tk.END, values=(sentence, category_mapping.get(label, "Неизвестно")))
+    #     except Exception as e:
+    #         logging.error(f"Ошибка обновления классификации: {e}", exc_info=True)
+    #         self.show_error(f"Ошибка классификации: {e}")

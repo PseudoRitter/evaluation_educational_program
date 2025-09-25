@@ -107,7 +107,7 @@ class TextPreprocessor:
             logging.error(f"Ошибка сегментации: {e}", exc_info=True)
             return []
 
-    def filter_short_sentences(self, sentences, min_words=1, max_words=10):
+    def filter_short_sentences(self, sentences, min_words=0, max_words=10):
         try:
             result = []
             for sentence in sentences:

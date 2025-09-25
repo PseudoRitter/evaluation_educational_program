@@ -44,7 +44,7 @@ def create_comparison_op_vacancies_tab(frame, app):
     app.graph_program_table.heading("program_code", text="Код", command=lambda: sort_treeview_column(app.graph_program_table, "program_code"))
     app.graph_program_table.heading("university", text="ВУЗ", command=lambda: sort_treeview_column(app.graph_program_table, "university"))
     app.graph_program_table.heading("year", text="Год", command=lambda: sort_treeview_column(app.graph_program_table, "year"))
-    app.graph_program_table.column("program_name", width=300)
+    app.graph_program_table.column("program_name", width=100)
     app.graph_program_table.column("program_code", width=100)
     app.graph_program_table.column("university", width=150)
     app.graph_program_table.column("year", width=50)
@@ -61,7 +61,7 @@ def create_comparison_op_vacancies_tab(frame, app):
     app.vacancy_table.pack(fill="both", expand=True, padx=5, pady=5)   
     app.vacancy_table.heading("vacancy_name", text="Название вакансии", command=lambda: sort_treeview_column(app.vacancy_table, "vacancy_name"))
     app.vacancy_table.heading("assessment_date", text="Дата оценки", command=lambda: sort_treeview_column(app.vacancy_table, "assessment_date"))
-    app.vacancy_table.column("vacancy_name", width=300)
+    app.vacancy_table.column("vacancy_name", width=100)
     app.vacancy_table.column("assessment_date", width=200)
 
     add_tooltip_to_treeview(app.vacancy_table)
@@ -134,8 +134,8 @@ def display_graph_op_vacancies(app):
     
     all_scores = [score for vacancy in vacancy_data for score in 
                   [vacancy["group_scores"].get(ctype, 0.0) for ctype in competence_types] + [vacancy["overall_score"]]]
-    y_min = max(0, min(all_scores) - Y_MARGIN_MIN)
-    y_max = min(1, max(all_scores) + Y_MARGIN_MAX)
+    y_min = max(0, min(all_scores) - Y_MARGIN_MIN-10)
+    y_max = min(100, max(all_scores) + Y_MARGIN_MAX+10)
     
     graph_window = tk.Toplevel(app.root)
     graph_window.title("График соответствия ОП и вакансий")
@@ -156,7 +156,7 @@ def display_graph_op_vacancies(app):
         
         for bar, score in zip(bars, scores):
             height = bar.get_height()
-            ax.text(bar.get_x() + BAR_WIDTH / 2, height, f"{height*4*100:.2f}", ha="center", va="bottom", fontsize=8)
+            ax.text(bar.get_x() + BAR_WIDTH / 2, height, f"{height:.0f}", ha="center", va="bottom", fontsize=8)
     
     ax.set_ylim(y_min, y_max)
     ax.set_xticks(offsets[n_bars // 2::n_bars])
@@ -200,7 +200,7 @@ def create_comparison_vacancies_op_tab(frame, app):
     app.program_table.heading("program_code", text="Код", command=lambda: sort_treeview_column(app.program_table, "program_code"))
     app.program_table.heading("university", text="ВУЗ", command=lambda: sort_treeview_column(app.program_table, "university"))
     app.program_table.heading("year", text="Год", command=lambda: sort_treeview_column(app.program_table, "year"))
-    app.program_table.column("program_name", width=300)
+    app.program_table.column("program_name", width=100)
     app.program_table.column("program_code", width=100)
     app.program_table.column("university", width=150)
     app.program_table.column("year", width=50)
@@ -284,8 +284,8 @@ def display_graph_vacancies_op(app):
         logging.warning(f"Более {MAX_COMPETENCES} видов компетенций, будут использованы только первые {MAX_COMPETENCES}.")
     
     all_scores = [score for program in program_data for score in [program["group_scores"].get(ctype, 0.0) for ctype in competence_types] + [program["overall_score"]]]
-    y_min = max(0, min(all_scores) - Y_MARGIN_MIN)
-    y_max = min(1, max(all_scores) + Y_MARGIN_MAX)
+    y_min = max(0, min(all_scores) - Y_MARGIN_MIN-10)
+    y_max = min(100, max(all_scores) + Y_MARGIN_MAX+10)
     
     graph_window = tk.Toplevel(app.root)
     graph_window.title("График соответствия вакансии и ОП")
@@ -306,7 +306,7 @@ def display_graph_vacancies_op(app):
         
         for bar, score in zip(bars, scores):
             height = bar.get_height()
-            ax.text(bar.get_x() + BAR_WIDTH / 2, height, f"{height*4*100:.2f}", ha="center", va="bottom", fontsize=8)
+            ax.text(bar.get_x() + BAR_WIDTH / 2, height, f"{height:.0f}", ha="center", va="bottom", fontsize=8)
     
     ax.set_ylim(y_min, y_max)
     ax.set_xticks(offsets[n_bars // 2::n_bars])
@@ -349,7 +349,7 @@ def create_frequency_tab(frame, app):
 
     add_tooltip_to_treeview(app.competence_frequency_table)
 
-    display_button = ttk.Button(frame, text="обновить", command=lambda: load_competence_frequency_table(app))
+    display_button = ttk.Button(frame, text="Обновить", command=lambda: load_competence_frequency_table(app))
     display_button.pack(pady=10)
 
     display_button = ttk.Button(frame, text="Отобразить гистограмму", command=lambda: display_frequency_histogram(app))
@@ -462,7 +462,7 @@ def plot_frequency_histogram(window, competences, frequencies):
     bars = ax.barh(numbers, freq_values, color=colors)
     ax.set_xlabel("Частота упоминания")
     ax.set_ylabel("Порядковый номер компетенции")
-    ax.set_title("Частота упоминания компетенций в вакансиях (сходство > 0.7)")
+    ax.set_title("Частота упоминания компетенций в вакансиях")
     ax.invert_yaxis()
 
     # Устанавливаем пределы оси X: от 0 до N + 10, где N — максимальная частота
@@ -488,4 +488,4 @@ def plot_frequency_histogram(window, competences, frequencies):
     # Встраиваем график в окно
     canvas = FigureCanvasTkAgg(fig, master=window)
     canvas.draw()
-    canvas.get_tk_widget().pack(fill="both", expand=True)
+    canvas.get_tk_widget().pack(fill="both", expand=False)
